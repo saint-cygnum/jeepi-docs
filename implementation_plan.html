@@ -1,0 +1,1570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jeepi — Implementation Plan</title>
+<style>
+/* ============ RESET & BASE ============ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; font-size: 16px; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  background: #f8fafc; color: #1e293b; line-height: 1.7;
+  display: flex; min-height: 100vh;
+}
+
+/* ============ COLOR PALETTE ============ */
+:root {
+  --primary: #2563eb; --primary-light: #dbeafe; --primary-dark: #1d4ed8;
+  --success: #16a34a; --success-light: #dcfce7; --success-dark: #15803d;
+  --warning: #d97706; --warning-light: #fef3c7; --warning-dark: #b45309;
+  --danger: #dc2626; --danger-light: #fee2e2; --danger-dark: #b91c1c;
+  --info: #0ea5e9; --info-light: #e0f2fe;
+  --bg: #f8fafc; --card: #ffffff; --border: #e2e8f0;
+  --text: #1e293b; --text-muted: #64748b; --text-light: #94a3b8;
+  --sidebar-bg: #0f172a; --sidebar-text: #cbd5e1; --sidebar-active: #2563eb;
+  --code-bg: #1e293b; --code-text: #e2e8f0;
+  --shadow: 0 1px 3px rgba(0,0,0,.1), 0 1px 2px rgba(0,0,0,.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0,0,0,.1), 0 4px 6px -4px rgba(0,0,0,.1);
+}
+
+/* ============ SIDEBAR NAV ============ */
+.sidebar {
+  position: fixed; top: 0; left: 0; width: 280px; height: 100vh;
+  background: var(--sidebar-bg); color: var(--sidebar-text);
+  overflow-y: auto; z-index: 100; padding: 1.5rem 0;
+  transition: transform .3s ease;
+}
+.sidebar::-webkit-scrollbar { width: 6px; }
+.sidebar::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+.sidebar-brand {
+  padding: 0 1.25rem 1.25rem; border-bottom: 1px solid #1e293b;
+  margin-bottom: 1rem;
+}
+.sidebar-brand h2 { color: #fff; font-size: 1.25rem; font-weight: 700; }
+.sidebar-brand p { color: var(--text-light); font-size: .8rem; margin-top: .25rem; }
+.sidebar nav { padding: 0 .75rem; }
+.sidebar nav a {
+  display: block; padding: .5rem .75rem; margin-bottom: 2px;
+  color: var(--sidebar-text); text-decoration: none; font-size: .82rem;
+  border-radius: 6px; transition: background .15s, color .15s;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sidebar nav a:hover { background: #1e293b; color: #fff; }
+.sidebar nav a .badge-sm {
+  display: inline-block; font-size: .65rem; padding: 1px 6px;
+  border-radius: 999px; margin-left: 6px; vertical-align: middle;
+  font-weight: 600;
+}
+.badge-green { background: var(--success); color: #fff; }
+.badge-amber { background: var(--warning); color: #fff; }
+.sidebar nav .nav-group-label {
+  display: block; padding: .6rem .75rem .25rem; color: var(--text-light);
+  font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+}
+
+/* ============ HAMBURGER (mobile) ============ */
+.hamburger {
+  display: none; position: fixed; top: 12px; left: 12px; z-index: 200;
+  background: var(--primary); color: #fff; border: none; border-radius: 8px;
+  width: 40px; height: 40px; font-size: 1.4rem; cursor: pointer;
+  box-shadow: var(--shadow);
+}
+.overlay {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5);
+  z-index: 99;
+}
+
+/* ============ MAIN CONTENT ============ */
+.main { margin-left: 280px; flex: 1; padding: 2.5rem 3rem 4rem; max-width: 960px; }
+
+/* ============ TYPOGRAPHY ============ */
+h1 { font-size: 2rem; font-weight: 800; color: var(--primary-dark); margin: 2.5rem 0 1rem; padding-bottom: .5rem; border-bottom: 3px solid var(--primary); }
+h2 { font-size: 1.45rem; font-weight: 700; color: var(--text); margin: 2rem 0 .75rem; }
+h3 { font-size: 1.15rem; font-weight: 600; color: #334155; margin: 1.5rem 0 .5rem; }
+h4 { font-size: 1rem; font-weight: 600; color: var(--text-muted); margin: 1rem 0 .4rem; }
+p, li { font-size: .95rem; }
+p { margin-bottom: .75rem; }
+a { color: var(--primary); }
+hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+
+/* ============ BADGES ============ */
+.badge {
+  display: inline-block; padding: 3px 12px; border-radius: 999px;
+  font-size: .78rem; font-weight: 700; vertical-align: middle;
+}
+.badge-completed { background: var(--success-light); color: var(--success-dark); }
+.badge-pending   { background: var(--warning-light); color: var(--warning-dark); }
+.badge-progress  { background: var(--info-light); color: #0369a1; }
+
+/* ============ CALLOUT BOXES ============ */
+.callout {
+  border-left: 4px solid; border-radius: 6px; padding: 1rem 1.25rem;
+  margin: 1rem 0; font-size: .9rem;
+}
+.callout-important { border-color: var(--warning); background: var(--warning-light); }
+.callout-note      { border-color: var(--info); background: var(--info-light); }
+
+/* ============ TABLES ============ */
+table {
+  width: 100%; border-collapse: collapse; margin: 1rem 0;
+  font-size: .88rem; background: var(--card); border-radius: 8px;
+  overflow: hidden; box-shadow: var(--shadow);
+}
+thead th {
+  background: var(--primary); color: #fff; padding: .75rem 1rem;
+  text-align: left; font-weight: 600; font-size: .82rem;
+  text-transform: uppercase; letter-spacing: .03em;
+}
+tbody td { padding: .65rem 1rem; border-bottom: 1px solid var(--border); }
+tbody tr:nth-child(even) { background: #f8fafc; }
+tbody tr:hover { background: var(--primary-light); }
+
+/* ============ CODE BLOCKS ============ */
+pre {
+  background: var(--code-bg); color: var(--code-text); border-radius: 8px;
+  padding: 1.25rem 1.5rem; overflow-x: auto; margin: 1rem 0;
+  font-size: .85rem; line-height: 1.6; box-shadow: var(--shadow);
+}
+code {
+  font-family: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', monospace;
+  font-size: .85em;
+}
+:not(pre) > code {
+  background: #f1f5f9; color: #be185d; padding: 2px 6px; border-radius: 4px;
+}
+
+/* ============ LISTS ============ */
+ul, ol { margin: .5rem 0 .75rem 1.5rem; }
+li { margin-bottom: .35rem; }
+li > ul, li > ol { margin-top: .25rem; }
+
+/* ============ RESPONSIVE ============ */
+@media (max-width: 900px) {
+  .sidebar { transform: translateX(-100%); }
+  .sidebar.open { transform: translateX(0); }
+  .overlay.open { display: block; }
+  .hamburger { display: flex; align-items: center; justify-content: center; }
+  .main { margin-left: 0; padding: 1.25rem 1rem 3rem; }
+  table { font-size: .8rem; }
+  thead th, tbody td { padding: .5rem .6rem; }
+  h1 { font-size: 1.5rem; }
+}
+
+/* ============ PRINT ============ */
+@media print {
+  .sidebar, .hamburger, .overlay { display: none !important; }
+  .main { margin-left: 0; padding: 0; max-width: 100%; }
+  pre { white-space: pre-wrap; word-break: break-all; }
+  body { font-size: 11pt; }
+}
+</style>
+</head>
+<body>
+
+<!-- Hamburger (mobile) -->
+<button class="hamburger" onclick="document.querySelector('.sidebar').classList.toggle('open');document.querySelector('.overlay').classList.toggle('open');">&#9776;</button>
+<div class="overlay" onclick="document.querySelector('.sidebar').classList.remove('open');this.classList.remove('open');"></div>
+
+<!-- Sidebar -->
+<aside class="sidebar">
+  <div class="sidebar-brand">
+    <h2>Jeepi Docs</h2>
+    <p>Implementation Plan</p>
+  </div>
+  <nav>
+    <span class="nav-group-label">Multi-Seat Payment Feature</span>
+<a href="#user-review-required">User Review Required</a>
+<a href="#proposed-changes">Proposed Changes</a>
+<a href="#verification-plan">Verification Plan</a>
+<span class="nav-group-label">Phase 2: Theming & Localization</span>
+<a href="#user-review-required">User Review Required</a>
+<a href="#proposed-changes">Proposed Changes</a>
+<a href="#verification-plan">Verification Plan</a>
+<span class="nav-group-label">Phase 3: Scalable Persistence Layer</span>
+<a href="#user-review-required">User Review Required</a>
+<a href="#proposed-changes">Proposed Changes</a>
+<a href="#verification-plan">Verification Plan</a>
+<span class="nav-group-label">Phase 4: Friends System & Group Payments</span>
+<a href="#overview">Overview</a>
+<a href="#implementation-status">Implementation Status</a>
+<a href="#features-implemented">Features Implemented</a>
+<a href="#user-flow">User Flow</a>
+<a href="#technical-details">Technical Details</a>
+<a href="#database-schema">Database Schema</a>
+<a href="#verification-checklist">Verification Checklist</a>
+<a href="#future-enhancements">Future Enhancements</a>
+<span class="nav-group-label">Phase 4B: Dagdag Bayad / Libre Ka-Jeepi</span>
+<a href="#overview">Overview</a>
+<a href="#implementation-status">Implementation Status</a>
+<a href="#features-implemented">Features Implemented</a>
+<a href="#verification-checklist">Verification Checklist</a>
+<span class="nav-group-label">Phase 5: Compliance — KYC, Documents, Au</span>
+<a href="#implementation-status">Implementation Status</a>
+<a href="#features-implemented">Features Implemented</a>
+<a href="#verification-checklist">Verification Checklist</a>
+<span class="nav-group-label">Phase 6: Payments — Gateway + Xendit</span>
+<a href="#implementation-status">Implementation Status</a>
+<a href="#features-implemented">Features Implemented</a>
+<a href="#verification-checklist">Verification Checklist</a>
+<span class="nav-group-label">Phase 6 (GPS): GPS-Based Transaction Mod</span>
+<a href="#implementation-status">Implementation Status</a>
+<span class="nav-group-label">Production Rollout — Sub-Phase 2A + 2B +</span>
+<a href="#implementation-status">Implementation Status</a>
+<span class="nav-group-label">Phase 2.5: Security Hardening v2</span>
+<a href="#implementation-status">Implementation Status</a>
+<a href="#phase-execution-order-revised-2026-02-24">Phase Execution Order (Revised 2026</a>
+<span class="nav-group-label">Phase 7: Anti-Spoofing — Confidence Scor</span>
+<a href="#features-implemented">Features Implemented</a>
+<span class="nav-group-label">Phase 8: Revenue, Reconciliation & Found</span>
+<a href="#features-implemented">Features Implemented</a>
+<span class="nav-group-label">Phase 9: UX Polishing & Branding</span>
+<a href="#sub-phases">Sub-Phases</a>
+<a href="#files-modified-phase-9-cumulative">Files Modified (Phase 9 cumulative)</a>
+<span class="nav-group-label">Phase 10: Wallet History, Earnings, API </span>
+<a href="#sub-phases">Sub-Phases</a>
+<a href="#files-modified-phase-10-cumulative">Files Modified (Phase 10 cumulative</a>
+<span class="nav-group-label">Phase 11: Multi-Trip Refactor & Offboard</span>
+<a href="#overview">Overview</a>
+<a href="#sub-phases">Sub-Phases</a>
+<a href="#files-modified">Files Modified</a>
+<span class="nav-group-label">Admin Auth + Sidebar Layout</span>
+<a href="#overview">Overview</a>
+<a href="#sub-phases">Sub-Phases</a>
+<a href="#files-modified">Files Modified</a>
+<span class="nav-group-label">Google OAuth (Sign in with Google)</span>
+<a href="#overview">Overview</a>
+<a href="#sub-phases">Sub-Phases</a>
+<a href="#files-modified">Files Modified</a>
+<span class="nav-group-label">Phone OTP Login (Sign in with Phone)</span>
+<a href="#overview">Overview</a>
+<a href="#sub-phases">Sub-Phases</a>
+<a href="#files-modified">Files Modified</a>
+
+  </nav>
+</aside>
+
+<!-- Main Content -->
+<main class="main">
+<h1 id="multi-seat-payment-feature">Multi-Seat Payment Feature </h1>
+<p>Allow passengers to select and pay for multiple seats in a single transaction.</p>
+<h2 id="user-review-required">User Review Required </h2>
+<div class="callout callout-important">This changes how seat selection works. Passengers will now:
+1. Tap seats to toggle selection (instead of immediately opening payment)
+2. Click a "Pay for X Seats" button to proceed to payment
+3. All selected seats share the same destination/fare</div>
+<h2 id="proposed-changes">Proposed Changes </h2>
+<h3 id="passenger-app">[Passenger App] </h3>
+<h4 id="modify-passenger-js-file-d-dev-_git-jeepi-pages-passenger-js">[MODIFY] [passenger.js](file:///d:/dev/_git/jeepi/pages/passenger.js) </h4>
+<ul>
+<li>Change <code>selectedSeat</code> to <code>selectedSeats</code> (array)</li>
+<li>Add a &quot;Pay for Selected Seats&quot; button that appears when seats are selected</li>
+<li>Update seat click handler to toggle selection</li>
+</ul>
+<h4 id="modify-seat-map-js-file-d-dev-_git-jeepi-components-seat-map-js">[MODIFY] [seat-map.js](file:///d:/dev/_git/jeepi/components/seat-map.js) </h4>
+<ul>
+<li>Support multi-select mode for passenger view</li>
+<li>Highlight all selected seats</li>
+<li>Update click handler to toggle instead of single-select</li>
+</ul>
+<h4 id="modify-payment-modal-js-file-d-dev-_git-jeepi-components-payment-modal-js">[MODIFY] [payment-modal.js](file:///d:/dev/_git/jeepi/components/payment-modal.js) </h4>
+<ul>
+<li>Accept array of seat numbers</li>
+<li>Calculate total fare (fare × seat count)</li>
+<li>Process payment for all seats at once</li>
+<li>Store all seat numbers in localStorage</li>
+</ul>
+<hr>
+<h3 id="backend">[Backend] </h3>
+<h4 id="modify-server-js-file-d-dev-_git-jeepi-server-js">[MODIFY] [server.js](file:///d:/dev/_git/jeepi/server.js) </h4>
+<ul>
+<li>Update <code>/api/seat/pay</code> to accept array of seat numbers</li>
+<li>Mark all seats as occupied in one transaction</li>
+</ul>
+<hr>
+<h2 id="verification-plan">Verification Plan </h2>
+<h3 id="manual-verification">Manual Verification </h3>
+<ol>
+<li>Select 2-3 seats on the passenger app</li>
+<li>Click &quot;Pay for X Seats&quot; button</li>
+<li>Verify total fare = single fare × seat count</li>
+<li>Complete payment and verify all seats are marked as paid</li>
+</ol>
+<hr>
+<h1 id="phase-2-theming-localization">Phase 2: Theming & Localization </h1>
+<h2 id="user-review-required">User Review Required </h2>
+<div class="callout callout-note">**Languages Selected**: Tagalog (Default), English, Cebuano, Ilocano, Kapampangan.
+**Theme Behavior**: "System" will automatically switch based on device settings.</div>
+<h2 id="proposed-changes">Proposed Changes </h2>
+<h3 id="core-infrastructure">[Core Infrastructure] </h3>
+<h4 id="new-components-theme-manager-js-file-d-dev-_git-jeepi-components-theme-manager-js">[NEW] [components/theme-manager.js](file:///d:/dev/_git/jeepi/components/theme-manager.js) </h4>
+<ul>
+<li>Manages &#39;light&#39;, &#39;dark&#39;, &#39;system&#39; preferences</li>
+<li>Applies <code>data-theme</code> attribute to <code>&lt;html&gt;</code></li>
+<li>Persists to localStorage</li>
+</ul>
+<h4 id="new-components-i18n-manager-js-file-d-dev-_git-jeepi-components-i18n-manager-js">[NEW] [components/i18n-manager.js](file:///d:/dev/_git/jeepi/components/i18n-manager.js) </h4>
+<ul>
+<li>Manages active language state</li>
+<li>Loads translations from <code>locales/</code></li>
+<li><code>t(key)</code> helper for string lookup</li>
+</ul>
+<h4 id="new-locales-file-d-dev-_git-jeepi-locales">[NEW] [locales/](file:///d:/dev/_git/jeepi/locales/) </h4>
+<ul>
+<li><code>en.js</code>, <code>tl.js</code>, <code>ceb.js</code>, <code>ilo.js</code>, <code>pam.js</code> dictionaries</li>
+</ul>
+<h3 id="styles">[Styles] </h3>
+<h4 id="modify-index-css-file-d-dev-_git-jeepi-index-css">[MODIFY] [index.css](file:///d:/dev/_git/jeepi/index.css) </h4>
+<ul>
+<li>Add <code>[data-theme=&quot;dark&quot;]</code> overrides for CSS variables:<ul>
+<li><code>--bg-main</code>: Darker gray/black</li>
+<li><code>--bg-card</code>: Dark gray</li>
+<li><code>--text-primary</code>: White/Light gray</li>
+</ul>
+</li>
+</ul>
+<h3 id="ui-components">[UI Components] </h3>
+<h4 id="modify-app-js-file-d-dev-_git-jeepi-app-js">[MODIFY] [app.js](file:///d:/dev/_git/jeepi/app.js) </h4>
+<ul>
+<li>Initialize Managers in <code>App.init()</code></li>
+<li>Add UI controls for Theme/Language in the Header or Settings</li>
+</ul>
+<h4 id="modify-pages-js-file-d-dev-_git-jeepi-pages-passenger-js">[MODIFY] [pages/*.js](file:///d:/dev/_git/jeepi/pages/passenger.js) </h4>
+<ul>
+<li>Replace hardcoded text with <code>I18n.t(&#39;key&#39;)</code></li>
+<li>Subscribe to language change events to re-render</li>
+</ul>
+<h2 id="verification-plan">Verification Plan </h2>
+<h3 id="manual-verification">Manual Verification </h3>
+<ol>
+<li><strong>Theming</strong>: Toggle Dark/Light/System. Verify background and text colors invert correctly.</li>
+<li><strong>i18n</strong>: Switch to Tagalog. Verify &quot;Welcome&quot;, &quot;Pay&quot;, &quot;Logout&quot; text updates.</li>
+</ol>
+<hr>
+<h1 id="phase-3-scalable-persistence-layer">Phase 3: Scalable Persistence Layer </h1>
+<h2 id="user-review-required">User Review Required </h2>
+<div class="callout callout-important">**Database Strategy**: We will use **Prisma ORM**.
+- **All environments**: Neon PostgreSQL (free tier for dev/test/CI, GCP Cloud SQL for production). Prisma uses `@prisma/adapter-pg`.
+
+**Data Migration**: Existing in-memory data will be lost upon server restart unless we seed it. I will create a seed script.</div>
+<h2 id="proposed-changes">Proposed Changes </h2>
+<h3 id="infrastructure">[Infrastructure] </h3>
+<h4 id="new-prisma-schema-prisma-file-d-dev-_git-jeepi-prisma-schema-prisma">[NEW] [prisma/schema.prisma](file:///d:/dev/_git/jeepi/prisma/schema.prisma) </h4>
+<ul>
+<li><strong>User</strong>: <code>id</code>, <code>email</code>, <code>password</code>, <code>name</code>, <code>role</code>, <code>walletBalance</code>, <code>preferences</code> (JSON: theme, lang)</li>
+<li><strong>Driver</strong>: <code>id</code>, <code>name</code>, <code>licenseNumber</code>, <code>walletBalance</code></li>
+<li><strong>Jeepney</strong>: <code>id</code>, <code>plateNumber</code>, <code>route</code>, <code>seats</code></li>
+<li><strong>Trip</strong>: <code>id</code>, <code>jeepneyId</code>, <code>driverId</code>, <code>status</code>, <code>startTime</code>, <code>earnings</code></li>
+<li><strong>Transaction</strong>: <code>id</code>, <code>userId</code>, <code>amount</code>, <code>type</code></li>
+</ul>
+<h4 id="new-services-db-js-file-d-dev-_git-jeepi-services-db-js">[NEW] [services/db.js](file:///d:/dev/_git/jeepi/services/db.js) </h4>
+<ul>
+<li>Initializes Prisma Client</li>
+<li>Exports database instance replacement for <code>server.js</code></li>
+</ul>
+<h3 id="backend">[Backend] </h3>
+<h4 id="modify-server-js-file-d-dev-_git-jeepi-server-js">[MODIFY] [server.js](file:///d:/dev/_git/jeepi/server.js) </h4>
+<ul>
+<li>Replace <code>const db = { ... }</code> with <code>prisma</code> queries.</li>
+<li><code>db.users.push()</code> -&gt; <code>await prisma.user.create()</code></li>
+<li><code>db.users.find()</code> -&gt; <code>await prisma.user.findUnique()</code></li>
+<li>Ensure <code>preferences</code> are saved during <code>api/auth/register</code> and updated via <code>api/settings</code>.</li>
+</ul>
+<h2 id="verification-plan">Verification Plan </h2>
+<h3 id="automated-tests">Automated Tests </h3>
+<ul>
+<li>Run seed script to verify DB creation.</li>
+<li>Check Prisma Studio (if available) or logs for insert confirmation.</li>
+</ul>
+<h3 id="manual-verification">Manual Verification </h3>
+<ol>
+<li><strong>Register</strong>: Create new user. Restart server. Login again. (Verify persistence)</li>
+<li><strong>Trips</strong>: Start trip. Restart server. Verify trip handles are still active.</li>
+</ol>
+<hr>
+<h1 id="phase-4-friends-system-group-payments">Phase 4: Friends System & Group Payments </h1>
+<h2 id="overview">Overview </h2>
+<p>Allow passengers to add friends and pay for their fares when riding on the same jeepney trip. This enables group travel with shared payment responsibility.</p>
+<h2 id="implementation-status">Implementation Status </h2>
+<p>✅ <strong>COMPLETED</strong> (2026-02-08)</p>
+<h2 id="features-implemented">Features Implemented </h2>
+<h3 id="database-layer">Database Layer </h3>
+<h4 id="modify-prisma-schema-prisma-prisma-schema-prisma">[MODIFY] [prisma/schema.prisma](../prisma/schema.prisma) </h4>
+<ul>
+<li>Added <code>FriendRequest</code> model with sender/receiver relations</li>
+<li>Fields: <code>id</code>, <code>senderId</code>, <code>receiverId</code>, <code>status</code>, <code>createdAt</code></li>
+<li>Relations to <code>User</code> model for bidirectional friend lookups</li>
+</ul>
+<h3 id="backend-api">Backend API </h3>
+<h4 id="modify-server-js-server-js">[MODIFY] [server.js](../server.js) </h4>
+<p>Added 6 friend management endpoints:</p>
+<ul>
+<li><code>POST /api/friends/request</code> - Send friend request</li>
+<li><code>POST /api/friends/accept</code> - Accept friend request</li>
+<li><code>POST /api/friends/reject</code> - Reject friend request</li>
+<li><code>POST /api/friends/list</code> - Get user&#39;s friends list</li>
+<li><code>POST /api/friends/pending</code> - Get pending friend requests</li>
+<li><code>POST /api/users/search</code> - Search users by phone/email</li>
+</ul>
+<h3 id="service-layer">Service Layer </h3>
+<h4 id="modify-services-jeepney-js-services-jeepney-js">[MODIFY] [services/jeepney.js](../services/jeepney.js) </h4>
+<p>Added 7 friend management methods:</p>
+<ul>
+<li><code>getFriends(userId)</code> - Fetch accepted friends</li>
+<li><code>sendFriendRequest(senderId, receiverId, searchType)</code></li>
+<li><code>acceptFriendRequest(requestId)</code></li>
+<li><code>rejectFriendRequest(requestId)</code></li>
+<li><code>getPendingRequests(userId)</code></li>
+<li><code>searchUsers(query)</code> - Search by phone or email</li>
+<li><code>getFriendsOnTrip(userId, friends)</code> - Detect friends on same trip</li>
+</ul>
+<h3 id="frontend-implementation">Frontend Implementation </h3>
+<h4 id="modify-pages-passenger-js-pages-passenger-js">[MODIFY] [pages/passenger.js](../pages/passenger.js) </h4>
+<p><strong>State Management:</strong></p>
+<ul>
+<li>Added <code>friends: []</code> - List of accepted friends</li>
+<li>Added <code>friendsOnTrip: []</code> - Friends detected on current trip</li>
+</ul>
+<p><strong>Initialization:</strong></p>
+<ul>
+<li><code>loadFriends()</code> - Loads friends on app start (line 31)</li>
+<li><code>updateFriendsOnTrip()</code> - Detects friends on trip (line 339)</li>
+</ul>
+<p><strong>UI Components:</strong></p>
+<ul>
+<li>Friends button in riding state header with badge count</li>
+<li>&quot;Pay for Friends&quot; button (conditional, only shows when friends are on trip)</li>
+<li>Friend management modal (view friends, see who&#39;s on trip)</li>
+<li>Add friend modal (search by phone/email, send requests)</li>
+<li>Pay for friends modal (select friends, choose destination, pay fares)</li>
+</ul>
+<p><strong>Methods Implemented (8 total):</strong></p>
+<ol>
+<li><code>loadFriends()</code> - Load user&#39;s friends from API</li>
+<li><code>updateFriendsOnTrip()</code> - Detect which friends are on current trip</li>
+<li><code>showFriendsModal()</code> - Display friends list with trip status badges</li>
+<li><code>showAddFriendModal()</code> - Show friend search interface</li>
+<li><code>searchFriends(query)</code> - Search users by phone/email</li>
+<li><code>sendFriendRequest(receiverId)</code> - Send friend request to user</li>
+<li><code>showPayForFriendsModal()</code> - Show payment interface for friends</li>
+<li><code>selectFriendDestination(destination, distanceKm)</code> - Process group payment</li>
+</ol>
+<h2 id="user-flow">User Flow </h2>
+<ol>
+<li><p><strong>Add Friends:</strong></p>
+<ul>
+<li>Click &quot;Friends&quot; button → &quot;Add Friend&quot;</li>
+<li>Search by phone number or email (min 3 characters)</li>
+<li>Send friend request</li>
+<li>Friend accepts request</li>
+</ul>
+</li>
+<li><p><strong>Pay for Friends:</strong></p>
+<ul>
+<li>Both users board the same jeepney</li>
+<li>&quot;Pay for Friends&quot; button appears with count badge</li>
+<li>Select friends to pay for (checkboxes)</li>
+<li>Choose destination for group</li>
+<li>Confirm payment</li>
+<li>Friends&#39; seats automatically marked as paid</li>
+</ul>
+</li>
+</ol>
+<h2 id="technical-details">Technical Details </h2>
+<h3 id="friend-detection-logic">Friend Detection Logic </h3>
+<ul>
+<li>Compares user IDs in current trip&#39;s seat list</li>
+<li>Matches against accepted friends list</li>
+<li>Updates <code>friendsOnTrip</code> array in real-time</li>
+<li>Triggers on trip state changes via render()</li>
+</ul>
+<h3 id="payment-flow">Payment Flow </h3>
+<ul>
+<li>Validates friend selection</li>
+<li>Calculates total fare (fare × number of friends)</li>
+<li>Processes individual <code>occupySeat</code> for each friend</li>
+<li>Deducts total from payer&#39;s wallet</li>
+<li>Updates seat statuses to &quot;paid&quot;</li>
+</ul>
+<h2 id="database-schema">Database Schema </h2>
+<pre><code class="lang-prisma">model FriendRequest {
+  id         String   @id @default(cuid())
+  senderId   String
+  receiverId String
+  status     String   @default("pending")
+  createdAt  DateTime @default(now())
+
+  sender     User     @relation("SentRequests", fields: [senderId], references: [id])
+  receiver   User     @relation("ReceivedRequests", fields: [receiverId], references: [id])
+}</code></pre>
+<h2 id="verification-checklist">Verification Checklist </h2>
+<h3 id="manual-testing">Manual Testing </h3>
+<ol>
+<li>✅ Create 2+ test passenger accounts</li>
+<li>✅ Add each other as friends (search → send request → accept)</li>
+<li>✅ Both board the same jeepney</li>
+<li>✅ Verify &quot;Friends&quot; button shows count badge</li>
+<li>✅ Click &quot;Pay for Friends&quot; → select friends → choose destination</li>
+<li>✅ Verify friends transition to &quot;Paid&quot; state automatically</li>
+<li>✅ Verify payer&#39;s balance is deducted correctly</li>
+</ol>
+<h3 id="code-quality">Code Quality </h3>
+<ul>
+<li>✅ All backend endpoints tested</li>
+<li>✅ All frontend methods implemented</li>
+<li>✅ Friend detection working correctly</li>
+<li>✅ Conditional UI rendering working</li>
+<li>✅ No console errors</li>
+</ul>
+<h2 id="future-enhancements">Future Enhancements </h2>
+<p>Potential improvements for future versions:</p>
+<ul>
+<li><strong>OAuth / Social Login</strong> — Google + Facebook for passenger registration (covers ~95% of PH market). Apple Sign-In required for App Store. Phone/SMS OTP as alternative. Implementation via Passport.js (server) or Capacitor native plugins. Driver registration stays username/password.</li>
+<li>Friend request notifications (real-time via Socket.io)</li>
+<li>Remove/unfriend functionality</li>
+<li>Split payment feature (multiple payers for one group)</li>
+<li>Friend activity history</li>
+<li>Favorite destinations for friend groups</li>
+</ul>
+<hr>
+<h1 id="phase-4b-dagdag-bayad-libre-ka-jeepi">Phase 4B: Dagdag Bayad / Libre Ka-Jeepi </h1>
+<h2 id="overview">Overview </h2>
+<p>Extends the core ride flow with two payment modes:</p>
+<ul>
+<li><strong>Dagdag Bayad</strong>: Passenger already on trip adds 1-3 companion seats (people without Jeepi accounts). All seats linked via <code>groupId</code>. Para cascades to entire group.</li>
+<li><strong>Libre Ka-Jeepi</strong>: Passenger sponsors a friend&#39;s fare on the same trip. Sponsor&#39;s wallet holds the friend&#39;s fare; friend&#39;s held balance is refunded. Settlement charges sponsor.</li>
+</ul>
+<h2 id="implementation-status">Implementation Status </h2>
+<p>✅ <strong>COMPLETED</strong> (2026-02-24)</p>
+<h2 id="features-implemented">Features Implemented </h2>
+<h3 id="database-layer">Database Layer </h3>
+<h4 id="modify-prisma-schema-prisma-prisma-schema-prisma">[MODIFY] [prisma/schema.prisma](../prisma/schema.prisma) </h4>
+<ul>
+<li>Added <code>groupId String?</code> to Seat — links companion seats for cascading para</li>
+<li>Added <code>sponsorId String?</code> to Seat — sponsor userId overrides passengerId for payment</li>
+</ul>
+<h4 id="new-config-constants-js-config-constants-js">[NEW] [config/constants.js](../config/constants.js) </h4>
+<ul>
+<li><code>DAGDAG_MAX_EXTRA_SEATS: 3</code> — max companions per dagdag request</li>
+<li><code>DAGDAG_MAX_TOTAL_SEATS: 4</code> — max total seats per passenger per trip</li>
+</ul>
+<h3 id="backend-api">Backend API </h3>
+<h4 id="modify-routes-seats-js-routes-seats-js">[MODIFY] [routes/seats.js](../routes/seats.js) </h4>
+<p>Added 4 new endpoints:</p>
+<ul>
+<li><code>POST /api/seat/dagdag</code> — Add companion seats (validated: count 1-3, total ≤ 4, capacity, balance)</li>
+<li><code>POST /api/seat/libre</code> — Sponsor friend&#39;s fare (validated: same trip, accepted friendship, not already sponsored)</li>
+<li><code>POST /api/seat/libre/cancel</code> — Cancel sponsorship (reverses balance transfer)</li>
+<li><code>GET /api/seat/friends-on-trip</code> — Friends eligible for libre with fare estimates</li>
+</ul>
+<p>Modified existing endpoint:</p>
+<ul>
+<li><code>POST /api/seat/para-request</code> — Added dagdag cascade (groupId seats get same alighting data)</li>
+</ul>
+<h3 id="service-layer">Service Layer </h3>
+<h4 id="modify-services-payment-service-js-services-payment-service-js">[MODIFY] [services/payment-service.js](../services/payment-service.js) </h4>
+<ul>
+<li><code>assignSeats()</code> — accepts optional <code>groupId</code>, auto-generates when <code>count &gt; 1</code></li>
+<li><code>settleSeat()</code> — checks <code>sponsorId</code> first, falls back to <code>passengerId</code> for charges. Appends &quot;(libre)&quot; to transaction description for sponsored seats.</li>
+<li>New <code>addCompanionSeats(tx, { trip, passengerId, primarySeat, count })</code> — validates limits, holds balance, creates companion seats with same boarding data</li>
+<li>New <code>sponsorSeat(tx, { seat, sponsorId })</code> — atomic: refund friend held → hold from sponsor → set sponsorId</li>
+<li>New <code>cancelSponsorship(tx, { seat })</code> — reverses balance transfer, clears sponsorId</li>
+</ul>
+<h3 id="frontend">Frontend </h3>
+<h4 id="modify-pages-driver-js-pages-driver-js">[MODIFY] [pages/driver.js](../pages/driver.js) </h4>
+<ul>
+<li><code>groupSeatsByPassenger()</code> tracks <code>isSponsored</code> and <code>sponsorName</code></li>
+<li><code>formatPassengerLabel(group)</code> renders &quot;Name + N&quot; for dagdag groups and &quot;Libre&quot; badge for sponsored seats</li>
+<li>Para screen uses <code>formatPassengerLabel</code> for passenger names</li>
+</ul>
+<h4 id="modify-pages-passenger-js-pages-passenger-js">[MODIFY] [pages/passenger.js](../pages/passenger.js) </h4>
+<ul>
+<li>Riding state shows companion count (&quot;You + N companions&quot;) and libre status</li>
+<li>&quot;Add Companions&quot; button (dagdag) with count stepper modal</li>
+<li>&quot;Treat a Friend&quot; button (libre) with friend picker modal and fare estimates</li>
+<li>Cancel libre action method</li>
+</ul>
+<h4 id="modify-services-jeepney-js-services-jeepney-js">[MODIFY] [services/jeepney.js](../services/jeepney.js) </h4>
+<ul>
+<li><code>dagdag(count)</code> — POST /seat/dagdag</li>
+<li><code>libre(friendId)</code> — POST /seat/libre</li>
+<li><code>cancelLibre(seatId)</code> — POST /seat/libre/cancel</li>
+<li><code>getFriendsOnTripApi()</code> — GET /seat/friends-on-trip</li>
+</ul>
+<h3 id="validation">Validation </h3>
+<h4 id="modify-middleware-validate-js-middleware-validate-js">[MODIFY] [middleware/validate.js](../middleware/validate.js) </h4>
+<ul>
+<li><code>validateDagdag</code> — count: int 1-3</li>
+<li><code>validateLibre</code> — friendId: non-empty string</li>
+</ul>
+<h3 id="i18n">i18n </h3>
+<h4 id="modify-locales-en-js-locales-en-js-locales-tl-js-locales-tl-js">[MODIFY] [locales/en.js](../locales/en.js) & [locales/tl.js](../locales/tl.js) </h4>
+<ul>
+<li>18 new keys each: dagdag (8) + libre (10)</li>
+</ul>
+<h3 id="tests">Tests </h3>
+<ul>
+<li><strong>15 unit tests</strong> (<code>test/unit/payment-dagdag-libre.test.js</code>) — assignSeats groupId, settleSeat with sponsorId, addCompanionSeats, sponsorSeat, cancelSponsorship</li>
+<li><strong>17 integration tests</strong> (<code>test/integration/dagdag-libre.test.js</code>) — dagdag (8) + libre (9)</li>
+<li><strong>Total: 217 vitest tests</strong> (98 integration + 119 unit)</li>
+</ul>
+<h3 id="infrastructure">Infrastructure </h3>
+<ul>
+<li>Local Docker PostgreSQL for tests (WSL2) — 37x speedup (608s → 16s)</li>
+<li><code>.env.test</code> for test DB connection, <code>.env</code> for production Neon</li>
+<li><code>test/global-setup.js</code> and <code>test/setup.js</code> auto-detect <code>.env.test</code></li>
+</ul>
+<h2 id="verification-checklist">Verification Checklist </h2>
+<ul>
+<li>✅ Schema migration applied (<code>prisma db push</code>)</li>
+<li>✅ All 217 tests pass</li>
+<li>✅ Dagdag: adds companions, assigns groupId, respects max, cascades para</li>
+<li>✅ Libre: sponsors fare, transfers hold atomically, charges sponsor at settlement</li>
+<li>✅ Cancel libre: reverses balance transfer correctly</li>
+<li>✅ Driver UI: &quot;Name + N&quot; labels, &quot;Libre&quot; badges</li>
+<li>✅ Passenger UI: dagdag modal, libre modal, status display</li>
+</ul>
+<hr>
+<h1 id="phase-5-compliance-kyc-documents-audit">Phase 5: Compliance — KYC, Documents, Audit </h1>
+<h2 id="implementation-status">Implementation Status </h2>
+<p>✅ <strong>COMPLETED</strong> (2026-02-24)</p>
+<p>Total: <strong>+46 new tests</strong> (217 → 263 vitest tests) across 9 sub-phases.</p>
+<h2 id="features-implemented">Features Implemented </h2>
+<h3 id="5a-schema-constants-kyc-service">5A: Schema + Constants + KYC Service </h3>
+<ul>
+<li>Added <code>kycLevel Int @default(0)</code>, <code>tosAcceptedAt DateTime?</code>, <code>tosVersion String?</code> to User model</li>
+<li>Added <code>kycLevel Int @default(0)</code> to Driver model</li>
+<li>New <code>KycDocument</code> model (id, userId, userType, docType, fileData, fileName, status, reviewedBy, reviewNotes, timestamps)</li>
+<li>New <code>AuditLog</code> model (id, actorId, actorType, action, resource, resourceId, details, ip, userAgent, createdAt)</li>
+<li><code>config/constants.js</code>: KYC_WALLET_TIERS (Level 0: ₱500, Level 1: ₱5,000, Level 2: ₱50,000), KYC_DOC_TYPES, TOS_CURRENT_VERSION</li>
+<li><code>services/kyc-service.js</code>: Factory pattern — uploadDocument, getDocuments, getKycStatus, reviewDocument, recalculateKycLevel</li>
+<li>14 unit tests (<code>test/unit/kyc-service.test.js</code>)</li>
+</ul>
+<h3 id="5b-kyc-api-endpoints">5B: KYC API Endpoints </h3>
+<ul>
+<li><code>routes/kyc.js</code>: POST /api/kyc/upload, GET /api/kyc/documents, GET /api/kyc/status, GET /api/kyc/pending (admin), POST /api/kyc/review (admin)</li>
+<li><code>middleware/validate.js</code>: validateKycUpload, validateKycReview validators</li>
+<li>12 integration tests (<code>test/integration/kyc.test.js</code>)</li>
+</ul>
+<h3 id="5c-wallet-tier-enforcement">5C: Wallet Tier Enforcement </h3>
+<ul>
+<li><code>routes/wallet.js</code>: Replaced hardcoded ₱100K cap with KYC_WALLET_TIERS[user.kycLevel].maxBalance</li>
+<li><code>test/helpers/fixtures.js</code>: seedPassenger defaults kycLevel: 2 to preserve existing test behavior</li>
+<li>8 integration tests (<code>test/integration/wallet-tiers.test.js</code>)</li>
+</ul>
+<h3 id="5d-admin-kyc-review-page">5D: Admin KYC Review Page </h3>
+<ul>
+<li><code>pages/admin-kyc.html</code> + <code>pages/admin-kyc.js</code>: Document queue with filter tabs, document viewer, approve/reject with notes</li>
+<li>KYC nav link added to all 8 admin page nav bars</li>
+</ul>
+<h3 id="5e-auditlog-auditservice-middleware">5E: AuditLog + AuditService + Middleware </h3>
+<ul>
+<li><code>services/audit-service.js</code>: Fire-and-forget structured audit logging (factory pattern)</li>
+<li><code>middleware/audit.js</code>: <code>auditAction(action, resource)</code> — intercepts res.json() to log successful responses</li>
+<li>AuditService wired into server.js via app.locals.AuditService</li>
+<li>4 unit tests (<code>test/unit/audit-service.test.js</code>)</li>
+</ul>
+<h3 id="5f-instrument-routes-with-audit-logging">5F: Instrument Routes with Audit Logging </h3>
+<ul>
+<li>Applied auditAction() middleware to ~20 high-value endpoints:<ul>
+<li>auth.register, auth.login, auth.driver_login</li>
+<li>wallet.reload, wallet.deduct</li>
+<li>kyc.upload, kyc.review</li>
+<li>seat.hopin, seat.para, seat.dagdag, seat.libre</li>
+<li>friend.send, friend.accept, friend.reject</li>
+<li>trip.start, trip.end</li>
+</ul>
+</li>
+</ul>
+<h3 id="5g-admin-audit-viewer-page">5G: Admin Audit Viewer Page </h3>
+<ul>
+<li><code>routes/audit.js</code>: GET /api/audit/logs (admin, paginated with filters)</li>
+<li><code>pages/admin-audit.html</code> + <code>pages/admin-audit.js</code>: Paginated table with filters (action, actor)</li>
+<li>Audit nav link added to all admin page nav bars</li>
+<li>4 integration tests (<code>test/integration/audit.test.js</code>)</li>
+</ul>
+<h3 id="5h-privacy-policy-tos-acceptance">5H: Privacy Policy + ToS Acceptance </h3>
+<ul>
+<li><code>routes/auth.js</code>: POST /api/auth/accept-tos (sets tosAcceptedAt + tosVersion)</li>
+<li>Login response includes <code>requireTosAcceptance: true</code> when tosVersion !== TOS_CURRENT_VERSION</li>
+<li>i18n: 5 ToS keys each in en.js and tl.js</li>
+<li>4 integration tests (<code>test/integration/tos.test.js</code>)</li>
+</ul>
+<h3 id="5i-docs-cleanup">5I: Docs + Cleanup </h3>
+<ul>
+<li>Updated all relevant documentation files</li>
+</ul>
+<h2 id="verification-checklist">Verification Checklist </h2>
+<ul>
+<li>✅ Schema migration applied (prisma db push)</li>
+<li>✅ All 263 tests pass (217 + 46 new)</li>
+<li>✅ KYC: document upload, approval workflow, level recalculation</li>
+<li>✅ Wallet tiers: Level 0 (₱500), Level 1 (₱5,000), Level 2 (₱50,000) enforced</li>
+<li>✅ Audit: 20 endpoints instrumented, fire-and-forget logging</li>
+<li>✅ ToS: acceptance flow, login flag, version tracking</li>
+<li>✅ Admin pages: KYC review queue, audit log viewer</li>
+</ul>
+<hr>
+<h1 id="phase-6-payments-gateway-xendit">Phase 6: Payments — Gateway + Xendit </h1>
+<h2 id="implementation-status">Implementation Status </h2>
+<p>✅ <strong>COMPLETED</strong> (2026-02-24)</p>
+<p>Total: <strong>+59 new tests</strong> (263 → 322 vitest tests) across Payment Gateway, AMLA, Auto-Reload, and Driver Cashout.</p>
+<h2 id="features-implemented">Features Implemented </h2>
+<h3 id="6a-schema-paymentgateway-facade-mock-adapter">6A: Schema + PaymentGateway Facade + Mock Adapter </h3>
+<ul>
+<li>New <code>Payment</code> model (id, userId, type, provider, providerChargeId, externalId, amount, currency, channelCode, status, description, webhookData, metadata, timestamps)</li>
+<li>New <code>PaymentMethod</code> model (id, userId, provider, providerTokenId, channelCode, label, lastFourDigits, isDefault, createdAt)</li>
+<li>New <code>AmlaFlag</code> model (id, userId, paymentId, type, riskScore, details, status, reviewedBy, reviewNotes, flaggedAt, reviewedAt)</li>
+<li>Added to User model: <code>autoReloadEnabled Boolean @default(false)</code>, <code>autoReloadAmount Float?</code>, <code>autoReloadThreshold Float?</code>, <code>defaultPaymentMethodId String?</code></li>
+<li><code>services/payment-gateway.js</code>: Factory pattern — <code>createCharge</code>, <code>verifyWebhook</code>, <code>getBalance</code>, <code>createDisbursement</code>, <code>tokenize</code>. Adapter-based (mock / xendit).</li>
+<li><code>services/adapters/mock-payment-adapter.js</code>: Full mock implementation for testing — simulates async webhook callbacks.</li>
+<li><code>services/adapters/xendit-adapter.js</code>: Xendit API integration (eWallet charges, disbursements, webhook signature verification).</li>
+</ul>
+<h3 id="6b-webhook-handler-payment-methods-crud">6B: Webhook Handler + Payment Methods CRUD </h3>
+<ul>
+<li><code>routes/webhooks.js</code>: <code>POST /api/webhooks/:provider</code> — Provider-routed webhook handler with signature verification, idempotency (providerChargeId unique constraint), wallet credit on successful charge.</li>
+<li><code>routes/payment-methods.js</code>: <code>GET /api/payment-methods</code> (list), <code>POST /api/payment-methods</code> (tokenize + save), <code>DELETE /api/payment-methods/:id</code> (remove). Default method management.</li>
+</ul>
+<h3 id="6c-wallet-reload-update-async-flow">6C: Wallet Reload Update (Async Flow) </h3>
+<ul>
+<li><code>routes/wallet.js</code>: Updated <code>POST /api/wallet/reload</code> — when <code>channelCode</code> is present (non-CASH), triggers async payment flow via PaymentGateway. Creates pending Payment record, returns <code>paymentId</code> + <code>checkoutUrl</code>. Webhook completes the flow.</li>
+<li>CASH reload (no channelCode) retains synchronous behavior.</li>
+</ul>
+<h3 id="6d-amla-compliance">6D: AMLA Compliance </h3>
+<ul>
+<li><code>services/amla-service.js</code>: Factory pattern — <code>checkTransaction</code> (automated flag triggers: large_transaction &gt; ₱50K, rapid_series &gt; 3 in 1hr, structuring pattern detection), <code>getFlags</code>, <code>reviewFlag</code>.</li>
+<li><code>routes/amla.js</code>: <code>GET /api/admin/amla/flags</code> (paginated, filterable), <code>POST /api/admin/amla/review</code> (clear/suspicious/report), <code>GET /api/admin/amla/flags/:userId</code> (per-user flags).</li>
+</ul>
+<h3 id="6e-driver-wallet-cashout">6E: Driver Wallet + Cashout </h3>
+<ul>
+<li><code>routes/driver-wallet.js</code>: <code>GET /api/driver/wallet/balance</code>, <code>POST /api/driver/wallet/cashout</code> (disbursement via PaymentGateway), <code>GET /api/driver/wallet/transactions</code>.</li>
+<li><code>middleware/driver-auth.js</code>: Driver-specific auth middleware for driver wallet routes.</li>
+</ul>
+<h3 id="6f-auto-reload">6F: Auto-Reload </h3>
+<ul>
+<li><code>services/auto-reload.js</code>: Factory pattern — <code>checkAndTrigger(userId)</code> evaluates balance against threshold, creates charge if below. <code>getSettings(userId)</code>, <code>updateSettings(userId, settings)</code>.</li>
+<li><code>routes/wallet.js</code>: <code>POST /api/wallet/auto-reload/settings</code> (update), <code>GET /api/wallet/auto-reload/settings</code> (read).</li>
+</ul>
+<h3 id="6g-admin-payments-dashboard-amla-review-page">6G: Admin Payments Dashboard + AMLA Review Page </h3>
+<ul>
+<li><code>pages/admin-payments.html</code> + <code>pages/admin-payments.js</code>: Payment history table, stats cards, filters (status, channel, date range).</li>
+<li><code>pages/admin-amla.html</code> + <code>pages/admin-amla.js</code>: AMLA flag review with modal (clear/suspicious/reported + notes).</li>
+<li><code>routes/admin.js</code>: Added <code>GET /api/admin/payments</code> (paginated, filterable), <code>GET /api/admin/payments/stats</code> (volume, success rate, pending, failed).</li>
+<li><strong>AdminHeader refactored</strong> (<code>components/admin-header.js</code>): Centralized <code>navItems</code> array — single source of truth for all 12 admin nav tabs. New pages need only an empty <code>&lt;nav class=&quot;main-nav&quot;&gt;&lt;/nav&gt;</code> placeholder; <code>AdminHeader.mount(tabId)</code> renders the nav. Eliminates hardcoded nav duplication across admin pages.</li>
+</ul>
+<h3 id="6h-frontend-reload-modal-channel-selection">6H: Frontend Reload Modal (Channel Selection) </h3>
+<ul>
+<li><code>components/reload-modal.js</code>: Updated with channel selector (Cash, GCash, Maya, GrabPay, Card). Sends <code>channelCode</code> to trigger async flow. Handles <code>status: &#39;pending&#39;</code> response with &quot;Payment Pending&quot; screen (redirect URL for e-wallets, socket listener for completion).</li>
+<li><code>services/wallet.js</code>: <code>reload(amount, method, channelCode)</code> — passes <code>channelCode</code> to backend when non-CASH.</li>
+</ul>
+<h3 id="6i-xendit-setup-guide">6I: Xendit Setup Guide </h3>
+<ul>
+<li><code>services/adapters/xendit-adapter.js</code>: Fully implemented with real Xendit API calls (eWallet charges, invoice-based card/bank, disbursements, card tokenization). Guarded by <code>assertConfigured()</code>.</li>
+<li><code>docs/xendit-setup-guide.md</code>: Step-by-step guide for Xendit account setup, API keys, webhook configuration, sandbox testing, and going live.</li>
+<li><code>.env.example</code>: Updated with Xendit env vars and documentation.</li>
+</ul>
+<h3 id="tests">Tests </h3>
+<ul>
+<li><strong>8 unit tests</strong> (<code>test/unit/mock-payment-adapter.test.js</code>) — MockPaymentAdapter charge/disburse/webhook lifecycle</li>
+<li><strong>8 unit tests</strong> (<code>test/unit/amla-service.test.js</code>) — AmlaService flag triggers, risk scoring, review workflow</li>
+<li><strong>6 unit tests</strong> (<code>test/unit/auto-reload.test.js</code>) — AutoReloadService threshold checks, settings CRUD</li>
+<li><strong>10 integration tests</strong> (<code>test/integration/payment-flow.test.js</code>) — End-to-end charge + webhook + wallet credit</li>
+<li><strong>7 integration tests</strong> (<code>test/integration/payment-gateway.test.js</code>) — PaymentGateway facade operations</li>
+<li><strong>10 integration tests</strong> (<code>test/integration/payment-methods.test.js</code>) — CRUD + default method management</li>
+<li><strong>5 integration tests</strong> (<code>test/integration/driver-cashout.test.js</code>) — Driver cashout disbursement flow</li>
+<li><strong>5 integration tests</strong> (<code>test/integration/amla-review.test.js</code>) — Admin AMLA review workflow</li>
+<li><strong>4 integration tests</strong> (<code>test/integration/admin-payments.test.js</code>) — Admin payments API (list, filter, stats, RBAC)</li>
+<li><strong>Total: 322 vitest tests</strong> (167 integration + 155 unit)</li>
+</ul>
+<h2 id="verification-checklist">Verification Checklist </h2>
+<ul>
+<li>✅ Schema migration applied (prisma db push)</li>
+<li>✅ All 322 tests pass (263 + 59 new)</li>
+<li>✅ Payment: charge → webhook → wallet credit (async flow)</li>
+<li>✅ Payment methods: tokenize, list, delete, set default</li>
+<li>✅ AMLA: automated flagging (large tx, rapid series, structuring), admin review</li>
+<li>✅ Auto-reload: threshold trigger, settings CRUD</li>
+<li>✅ Driver cashout: disbursement via PaymentGateway</li>
+<li>✅ Admin payments: dashboard with stats, filters, search</li>
+<li>✅ Admin AMLA: flag review with modal (clear/suspicious/reported)</li>
+<li>✅ Wallet reload: backward-compatible (CASH sync + channelCode async)</li>
+<li>✅ ReloadModal: channel selector (Cash/GCash/Maya/GrabPay/Card) with async pending state</li>
+<li>✅ XenditAdapter: real API calls implemented (guarded, ready for keys)</li>
+<li>✅ Xendit setup guide: docs/xendit-setup-guide.md</li>
+</ul>
+<hr>
+<h1 id="phase-6-gps-gps-based-transaction-model">Phase 6 (GPS): GPS-Based Transaction Model </h1>
+<h2 id="implementation-status">Implementation Status </h2>
+<p>✅ <strong>COMPLETED</strong> — See <a href="gps_plan.md">docs/gps_plan.md</a> for full plan and <a href="walkthrough.md">docs/walkthrough.md</a> for verification.</p>
+<h3 id="sub-phases-completed">Sub-phases Completed </h3>
+<ul>
+<li><strong>6A:</strong> Schema Foundation + GPS Utilities (LocationLog, Seat GPS fields, geo.js, gps.js)</li>
+<li><strong>6B:</strong> Balance Hold System (hopin, para-request, settle endpoints)</li>
+<li><strong>6C:</strong> Passenger Hop In Flow (GPS-based boarding)</li>
+<li><strong>6D:</strong> Para Po + Settlement Flow (GPS fare calculation)</li>
+<li><strong>6E:</strong> GPS Tracking During Trip (driver + passenger continuous tracking)</li>
+<li><strong>6F:</strong> Admin Route Stop GPS Editor</li>
+<li><strong>6G:</strong> Edge Cases + Fallbacks (GPS failure, proximity bypass, legacy endpoints)</li>
+<li><strong>6H:</strong> Simulation &amp; Testing Utilities (GPS simulator, test users, route progress)</li>
+<li><strong>6I:</strong> Location Audit Trail + Smart GPS Pulsing</li>
+</ul>
+<h3 id="phase-6i-location-audit-trail-smart-gps-pulsing">Phase 6I: Location Audit Trail + Smart GPS Pulsing </h3>
+<p><strong>Location Audit Trail:</strong></p>
+<ul>
+<li><code>LocationLog.tripId</code> made optional for non-trip audit entries</li>
+<li>Shared <code>logLocation()</code> utility (fire-and-forget, no-op when GPS unavailable)</li>
+<li>33 user-initiated endpoints instrumented with location tagging</li>
+<li>Frontend auto-injects <code>window.currentLocation</code> into all API mutations</li>
+</ul>
+<p><strong>Smart GPS Pulsing:</strong></p>
+<ul>
+<li>Passenger GPS starts only on boarding/reservation, stops on alight/cancel/logout</li>
+<li>Driver GPS stop gap fixed on logout</li>
+<li>Saves battery vs. unconditional GPS tracking on page load</li>
+</ul>
+<p><strong>Tests:</strong> 124 passing (7 unit + 6 integration for location audit)</p>
+<hr>
+<h1 id="production-rollout-sub-phase-2a-2b-2c">Production Rollout — Sub-Phase 2A + 2B + 2C </h1>
+<h2 id="implementation-status">Implementation Status </h2>
+<p><strong>COMPLETED</strong> (2026-02-23)</p>
+<h3 id="sub-phase-2a-capacitor-url-portability">Sub-Phase 2A: Capacitor URL Portability </h3>
+<p>All hardcoded <code>localhost</code> and <code>/api</code> fetch calls replaced with dynamic URL resolution via <code>JeepiConfig.getApiBase()</code>. The Capacitor native app can now connect to any server URL without code changes.</p>
+<p><strong>Files Changed:</strong></p>
+<ul>
+<li><code>services/api-url.js</code> — NEW. Capacitor native detection: checks <code>localStorage.JEEPI_SERVER_URL</code> → falls back to <code>window.JEEPI_SERVER_URL</code> → falls back to <code>window.location.origin</code>. Exports <code>JeepiConfig.getApiBase()</code> and <code>JeepiConfig.getWsUrl()</code>.</li>
+<li><code>services/jeepney.js</code> — Replaced hardcoded <code>/api</code> prefix with <code>JeepiConfig.getApiBase()</code> calls.</li>
+<li><code>pages/passenger.js</code> — Fixed 8 hardcoded <code>fetch(&#39;/api/...&#39;)</code> calls to use <code>JeepiConfig.getApiBase()</code>.</li>
+<li><code>pages/driver.js</code> — Fixed 2 hardcoded <code>fetch(&#39;/api/...&#39;)</code> calls.</li>
+<li>9 HTML files — Service worker registration disabled in Capacitor native context (<code>window.Capacitor?.isNativePlatform()</code>).</li>
+</ul>
+<p><strong>Frontend headers:</strong> All fetch calls in <code>jeepney.js</code>, <code>wallet.js</code>, <code>passenger.js</code>, <code>driver.js</code> now send <code>X-Jeepi-Platform</code> and <code>X-Jeepi-Version</code> headers for server-side analytics and debugging.</p>
+<h3 id="sub-phase-2b-contextual-server-side-logging">Sub-Phase 2B: Contextual Server-Side Logging </h3>
+<p>Structured lifecycle logging added to all route handlers and middleware. Every request is enriched with contextual fields for Cloud Logging queries.</p>
+<p><strong>Files Changed:</strong></p>
+<ul>
+<li><code>middleware/request-context.js</code> — NEW. Enriches <code>req.log</code> (pino child logger) with: <code>userId</code>, <code>tripId</code>, <code>driverId</code>, <code>platform</code>, <code>appVersion</code>, <code>requestId</code> (from <code>X-Request-Id</code> header), and GCP Cloud Trace correlation (<code>logging.googleapis.com/trace</code>).</li>
+<li><code>server.js</code> — CORS origins updated for <code>capacitor://localhost</code> and <code>http://localhost</code>. <code>pinoHttp</code> serializer updated with password field redaction. Socket lifecycle logs added (connect, disconnect, join room).</li>
+<li>Route handlers (<code>auth.js</code>, <code>driver-auth.js</code>, <code>trips.js</code>, <code>seats.js</code>, <code>wallet.js</code>, <code>reservations.js</code>, <code>friends.js</code>, <code>admin.js</code>) — 31+ lifecycle log lines at state transitions (e.g., trip start/end, boarding, payment, settlement).</li>
+<li><code>test/helpers/create-app.js</code> — Mounts <code>request-context</code> middleware so tests exercise the same logging path.</li>
+</ul>
+<h3 id="sub-phase-2c-capacitor-shell-build-script">Sub-Phase 2C: Capacitor Shell + Build Script </h3>
+<p>Capacitor projects initialized for passenger and driver apps with an automated build/sync script. Old React Native stubs deleted.</p>
+<p><strong>Changes:</strong></p>
+<ul>
+<li>Deleted <code>mobile/passenger-app/</code> and <code>mobile/driver-app/</code> (old React Native stubs, 689MB unused <code>node_modules</code>).</li>
+<li>Socket.io client bundling — replaced <code>document.write()</code> dynamic loading in all 12 HTML files with static <code>&lt;script src=&quot;public/js/socket.io.min.js&quot;&gt;</code>. Copied from <code>node_modules/socket.io/client-dist/</code>. Works for both Express static and Capacitor local file contexts.</li>
+<li><code>mobile/passenger/</code> — Capacitor project (<code>ph.jeepi.passenger</code>). <code>@capacitor/core@7</code>, <code>@capacitor/android@7</code>, <code>@capacitor/ios@7</code>, <code>@capacitor/cli@7</code>. Android platform initialized. Uses <code>capacitor.config.json</code> (not .ts, avoids TypeScript dependency).</li>
+<li><code>mobile/driver/</code> — Capacitor project (<code>ph.jeepi.driver</code>, appName: <code>Jeepi Driver</code>). Same Capacitor 7 dependencies. Android platform initialized.</li>
+<li><code>scripts/cap-sync.js</code> — Build script. Copies ~32 frontend files to Capacitor <code>www/</code>, generates <code>config.js</code> (<code>JEEPI_SERVER_URL</code>, <code>JEEPI_APP_VERSION</code>), creates <code>index.html</code> redirect, injects <code>config.js</code> into HTML files, runs <code>npx cap sync</code>. Usage: <code>node scripts/cap-sync.js --app=passenger [--server=URL]</code>.</li>
+<li><code>.gitignore</code> — Added <code>mobile/*/www/</code>, <code>mobile/*/android/</code>, <code>mobile/*/ios/</code>, <code>mobile/*/node_modules/</code>, <code>public/js/socket.io.min.js</code>.</li>
+<li><code>package.json</code> — Added scripts: <code>build:socketio</code>, <code>cap:sync:passenger</code>, <code>cap:sync:driver</code>, <code>cap:sync:all</code>.</li>
+</ul>
+<p><strong>Build output:</strong> Passenger: 32 files, Driver: 30 files. All 124 tests pass.</p>
+<h3 id="sub-phase-2d-capacitor-geolocation">Sub-Phase 2D: Capacitor Geolocation </h3>
+<p>Dual-mode GPS service — uses Capacitor <code>@capacitor/geolocation</code> plugin on native platforms (Android/iOS), falls back to browser <code>navigator.geolocation</code> API on web.</p>
+<p><strong>Files Changed:</strong></p>
+<ul>
+<li><code>services/gps.js</code> — Refactored for dual-mode. New <code>init()</code> method detects <code>window.Capacitor?.isNativePlatform()</code> and stores reference to <code>Capacitor.Plugins.Geolocation</code>. <code>getCurrentPosition()</code> and <code>startTracking()</code> use native plugin when available, browser API otherwise. <code>stopTracking()</code> is now async (native <code>clearWatch</code> returns a promise). Simulated tracking (socket-based) unchanged.</li>
+<li><code>app.js</code> — Added <code>GpsService.init()</code> call in <code>App.init()</code> alongside ThemeManager and I18n initialization.</li>
+<li><code>mobile/passenger/package.json</code> — Added <code>@capacitor/geolocation@^7.1.8</code>.</li>
+<li><code>mobile/driver/package.json</code> — Added <code>@capacitor/geolocation@^7.1.8</code>.</li>
+</ul>
+<p><strong>Cap-sync verified:</strong> Both passenger (32 files) and driver (30 files) builds succeed. Capacitor detects <code>@capacitor/geolocation@7.1.8</code> as Android plugin. All 124 tests pass.</p>
+<p><strong>Native permissions (set up by <code>npx cap sync</code>):</strong></p>
+<ul>
+<li>Android: <code>ACCESS_FINE_LOCATION</code>, <code>ACCESS_COARSE_LOCATION</code> (via plugin&#39;s AndroidManifest.xml merge)</li>
+<li>iOS: Requires manual <code>NSLocationWhenInUseUsageDescription</code> in Info.plist (done at first iOS build)</li>
+</ul>
+<h3 id="sub-phase-2e-background-gps-wake-lock">Sub-Phase 2E: Background GPS + Wake Lock </h3>
+<p>GPS tracking now continues when the app is backgrounded on native platforms. Screen stays on during active trips.</p>
+<p><strong>Plugin choices:</strong></p>
+<ul>
+<li><code>@capacitor-community/background-geolocation@1.2.26</code> — Free, Capacitor 7 compatible. Android foreground service with notification. Chosen over commercial <code>@transistorsoft</code> (paid for release builds) and <code>@capgo</code> (requires global bridge change).</li>
+<li><code>@capacitor-community/keep-awake@7.1.0</code> — Free, Capacitor 7 compatible. <code>keepAwake()</code> / <code>allowSleep()</code> API.</li>
+</ul>
+<p><strong>Architecture:</strong> Tri-mode fallback chain in <code>GpsService</code>:</p>
+<ol>
+<li><strong>Background native</strong> (preferred) — <code>BackgroundGeolocation.addWatcher()</code> with foreground service notification (&quot;Jeepi — Active Trip&quot;). Continues in background.</li>
+<li><strong>Foreground native</strong> (fallback) — <code>@capacitor/geolocation</code> watchPosition. Stops when backgrounded.</li>
+<li><strong>Browser</strong> — <code>navigator.geolocation</code>. No change from before.</li>
+</ol>
+<p>Wake lock is enabled/disabled automatically inside <code>startTracking()</code> / <code>stopTracking()</code>.</p>
+<p><strong>Files Changed:</strong></p>
+<ul>
+<li><code>services/gps.js</code> — Tri-mode refactor. New properties: <code>_bgGeo</code>, <code>_keepAwake</code>, <code>_useBgGeo</code>, <code>_bgWatcherId</code>, <code>_wakeLockActive</code>. New methods: <code>enableWakeLock()</code>, <code>disableWakeLock()</code>. <code>init()</code> detects all three plugins. <code>startTracking()</code> uses background plugin first, falls back gracefully.</li>
+<li><code>mobile/passenger/package.json</code> — Added <code>@capacitor-community/background-geolocation@1.2.26</code>, <code>@capacitor-community/keep-awake@7.1.0</code>.</li>
+<li><code>mobile/driver/package.json</code> — Same plugin additions.</li>
+<li><code>mobile/*/android/.../AndroidManifest.xml</code> — Added 7 permissions: <code>ACCESS_COARSE_LOCATION</code>, <code>ACCESS_FINE_LOCATION</code>, <code>ACCESS_BACKGROUND_LOCATION</code>, <code>FOREGROUND_SERVICE</code>, <code>FOREGROUND_SERVICE_LOCATION</code>, <code>WAKE_LOCK</code>, <code>POST_NOTIFICATIONS</code>.</li>
+</ul>
+<p><strong>NOT modified:</strong> <code>pages/driver.js</code>, <code>pages/passenger.js</code>, <code>app.js</code>, <code>scripts/cap-sync.js</code> — the GpsService API surface is unchanged. All background/wake-lock logic is encapsulated.</p>
+<p><strong>Cap-sync verified:</strong> Both builds detect all 3 plugins. All 124 tests pass.</p>
+<h3 id="sub-phase-2f-capacitor-8-upgrade">Sub-Phase 2F: Capacitor 8 Upgrade </h3>
+<p>Upgraded all Capacitor dependencies from v7 to v8 across both mobile projects. Required for BLE dual-mode plugin (<code>@capgo/capacitor-bluetooth-low-energy</code>) which needs <code>@capacitor/core &gt;= 8.0.0</code>.</p>
+<p><strong>Upgrade matrix:</strong></p>
+<ul>
+<li><code>@capacitor/core</code> 7.5.0 → 8.1.0</li>
+<li><code>@capacitor/cli</code> ^7 → ^8</li>
+<li><code>@capacitor/android</code> ^7 → ^8</li>
+<li><code>@capacitor/ios</code> ^7 → ^8</li>
+<li><code>@capacitor/geolocation</code> 7.1.8 → 8.1.0</li>
+<li><code>@capacitor-community/keep-awake</code> 7.1.0 → 8.0.0</li>
+<li><code>@capacitor-community/background-geolocation</code> 1.2.26 → 1.2.26 (unchanged, supports &gt;=3.0.0)</li>
+</ul>
+<p><strong>Files Changed:</strong></p>
+<ul>
+<li><code>mobile/passenger/package.json</code> — 5 deps bumped to v8.</li>
+<li><code>mobile/driver/package.json</code> — Same 5 deps bumped.</li>
+<li><code>mobile/*/android/app/src/main/AndroidManifest.xml</code> — Regenerated via <code>npx cap add android</code>, then re-applied 7 custom permissions. Cap 8 added <code>density</code> to activity <code>configChanges</code>.</li>
+</ul>
+<p><strong>NOT modified:</strong> <code>services/gps.js</code> — Capacitor 8 geolocation/keep-awake APIs are backwards-compatible with v7. Only behavioral change: <code>timeout</code> option now applies to all platforms (was web-only in v7). No code changes needed.</p>
+<p><strong>Verification:</strong> Cap-sync detects all 3 plugins (<a href="mailto:background-geolocation@1.2.26">background-geolocation@1.2.26</a>, <a href="mailto:keep-awake@8.0.0">keep-awake@8.0.0</a>, <a href="mailto:geolocation@8.1.0">geolocation@8.1.0</a>). All 124 tests pass.</p>
+<h3 id="sub-phase-2f-5-ble-proximity-detection">Sub-Phase 2F.5: BLE Proximity Detection </h3>
+<p>BLE (Bluetooth Low Energy) proximity detection. Driver advertises as BLE peripheral during active trips; passenger scans for nearby beacons and attaches RSSI signal strength to GPS pulses.</p>
+<p><strong>Plugin:</strong> <code>@capgo/capacitor-bluetooth-low-energy@1.1.11</code> — Dual-mode (peripheral + central), free, Capacitor 8 compatible.</p>
+<p><strong>Architecture:</strong> RSSI piggybacks on existing <code>gps-update</code> socket events — no new socket events or server routes. Passenger&#39;s BLE scan callback stores latest RSSI locally; GPS pulse callback reads it and includes in payload. Server stores in <code>LocationLog.rssi</code>.</p>
+<p><strong>Service UUID:</strong> <code>6a656570-692d-426c-652d-70726f786d74</code> (fixed Jeepi BLE identifier)
+<strong>Advertising name:</strong> <code>Jeepi-{jeepneyId}</code> (e.g. <code>Jeepi-J001</code>)</p>
+<p><strong>Files Created:</strong></p>
+<ul>
+<li><code>services/ble.js</code> — BLE service following GpsService pattern. <code>init()</code> detects native plugin, <code>startAdvertising(jeepneyId)</code> / <code>stopAdvertising()</code> for driver, <code>startScanning()</code> / <code>stopScanning()</code> for passenger, <code>getLatestRssi()</code> for GPS pulse injection. Graceful no-ops on web.</li>
+</ul>
+<p><strong>Files Modified:</strong></p>
+<ul>
+<li><code>app.js</code> — Added <code>BleService.init()</code> alongside GpsService.</li>
+<li><code>pages/driver.js</code> — <code>startTrip()</code>: start BLE advertising. <code>endTrip()</code>: stop advertising.</li>
+<li><code>pages/passenger.js</code> — <code>doHopIn()</code>: start BLE scanning. <code>signalStop()</code>: stop scanning. <code>_startGpsPulsing()</code>: include <code>rssi</code> in <code>gps-update</code> payload.</li>
+<li><code>prisma/schema.prisma</code> — Added <code>rssi Float?</code> to LocationLog model.</li>
+<li><code>server.js</code> — <code>gps-update</code> handler accepts optional <code>rssi</code> field, stores in LocationLog.</li>
+<li><code>passenger.html</code>, <code>driver.html</code> — Added <code>&lt;script src=&quot;services/ble.js?v=1&quot;&gt;</code>.</li>
+<li><code>scripts/cap-sync.js</code> — Added <code>services/ble.js</code> to shared assets.</li>
+<li><code>mobile/passenger/package.json</code>, <code>mobile/driver/package.json</code> — Added <code>@capgo/capacitor-bluetooth-low-energy</code>.</li>
+<li><code>prisma/migrations/migration_lock.toml</code> — Fixed provider from <code>sqlite</code> to <code>postgresql</code>.</li>
+</ul>
+<p><strong>NOT modified:</strong> AndroidManifest.xml — BLE plugin auto-declares permissions via Capacitor manifest merge.</p>
+<p><strong>Cap-sync verified:</strong> Both builds detect 4 plugins (<a href="mailto:background-geolocation@1.2.26">background-geolocation@1.2.26</a>, <a href="mailto:keep-awake@8.0.0">keep-awake@8.0.0</a>, <a href="mailto:geolocation@8.1.0">geolocation@8.1.0</a>, <a href="mailto:bluetooth-low-energy@1.1.11">bluetooth-low-energy@1.1.11</a>). Passenger: 33 files, Driver: 31 files. All 124 tests pass.</p>
+<h3 id="sub-phase-2g-push-notifications-fcm">Sub-Phase 2G: Push Notifications (FCM) </h3>
+<p>Firebase Cloud Messaging push notifications for offline/background user alerts. Gracefully disabled when Firebase env vars are not configured — all send methods become no-ops.</p>
+<p><strong>Server-side:</strong></p>
+<ul>
+<li><code>services/push-service.js</code> — NEW. Firebase Admin SDK wrapper. Initializes from 3 env vars (<code>FIREBASE_PROJECT_ID</code>, <code>FIREBASE_CLIENT_EMAIL</code>, <code>FIREBASE_PRIVATE_KEY</code>). <code>sendToUser(prisma, userId, payload)</code> / <code>sendToUsers(prisma, userIds, payload)</code> look up DeviceTokens and send via <code>sendEachForMulticast()</code>. Auto-cleans stale tokens (<code>messaging/registration-token-not-registered</code>).</li>
+<li><code>routes/device-tokens.js</code> — NEW. <code>POST /api/device-token/register</code> (upsert token+platform), <code>DELETE /api/device-token/unregister</code> (remove on logout). Both require <code>verifySession</code>.</li>
+<li><code>prisma/schema.prisma</code> — Added <code>DeviceToken</code> model (userId, token, platform, timestamps) with <code>@unique</code> on token and <code>onDelete: Cascade</code> on User relation.</li>
+</ul>
+<p><strong>Client-side:</strong></p>
+<ul>
+<li><code>services/push.js</code> — NEW. Client-side push registration following BLE service pattern. <code>init()</code> detects native plugin, requests permission, registers for FCM. <code>_sendTokenToServer()</code> posts token to <code>/api/device-token/register</code>. Foreground notifications bridged via <code>@capacitor/local-notifications</code>. <code>unregister()</code> called on logout.</li>
+<li>Plugins: <code>@capacitor/push-notifications@8</code>, <code>@capacitor/local-notifications@8</code> installed in both mobile projects.</li>
+</ul>
+<p><strong>Push triggers wired into 3 events:</strong></p>
+<ol>
+<li>Friend request received (<code>routes/friends.js</code>) — notifies receiver</li>
+<li>Reservation matched (<code>services/reservation-matcher.js</code>) — notifies passenger with jeepney plate</li>
+<li>Fare settled (<code>routes/seats.js</code>) — notifies passengers with amount</li>
+</ol>
+<p><strong>Files Modified:</strong></p>
+<ul>
+<li><code>server.js</code> — Require <code>push-service.js</code>, add <code>PushService</code> to shared context, mount <code>device-tokens</code> route.</li>
+<li><code>routes/friends.js</code> — Accept <code>PushService</code> from ctx, trigger push on friend request created.</li>
+<li><code>services/reservation-matcher.js</code> — Accept <code>PushService</code> from ctx, trigger push on reservation matched.</li>
+<li><code>routes/seats.js</code> — Accept <code>PushService</code> from ctx, trigger push on fare settled.</li>
+<li><code>app.js</code> — Added <code>PushService.init()</code> alongside BleService.</li>
+<li><code>passenger.html</code>, <code>driver.html</code>, <code>settings.html</code> — Added <code>&lt;script src=&quot;services/push.js?v=1&quot;&gt;</code>.</li>
+<li><code>scripts/cap-sync.js</code> — Added <code>services/push.js</code> to shared assets.</li>
+<li><code>pages/settings.js</code> — Added <code>PushService.unregister()</code> to both logout methods.</li>
+<li><code>.gitignore</code> — Added <code>google-services.json</code>, <code>GoogleService-Info.plist</code>, <code>*-service-account-key.json</code>.</li>
+</ul>
+<p><strong>Cap-sync verified:</strong> Both builds detect 6 plugins (background-geolocation, keep-awake, geolocation, bluetooth-low-energy, push-notifications, local-notifications). All 124 tests pass.</p>
+<h3 id="sub-phase-2h-playwright-e2e-smoke-tests">Sub-Phase 2H: Playwright E2E Smoke Tests </h3>
+<p>Browser-level end-to-end smoke tests using Playwright. Validates that all four app pages load correctly, auth flows work, and the admin dashboard receives real-time data via Socket.io.</p>
+<p><strong>New files:</strong></p>
+<ul>
+<li><code>playwright.config.js</code> — Playwright test config (auto-detects HTTPS, Chromium-only, <code>webServer</code> auto-start)</li>
+<li><code>test/e2e/smoke.spec.js</code> — 4 page load tests (passenger, driver, admin, settings)</li>
+<li><code>test/e2e/auth.spec.js</code> — 3 auth flow tests (passenger register, passenger login, driver login)</li>
+<li><code>test/e2e/admin.spec.js</code> — 1 admin dashboard test (fleet data loads via Socket.io)</li>
+<li><code>@playwright/test</code> ^1.58.2 devDependency, <code>test:e2e</code> npm script</li>
+<li><code>test-results/</code>, <code>playwright-report/</code> added to <code>.gitignore</code></li>
+</ul>
+<p><strong>Bug fixes caught by E2E tests (real bugs):</strong></p>
+<ul>
+<li><code>middleware/auth.js</code> — Added <code>/api/state</code> and <code>/api/trip/check</code> to public paths (were incorrectly blocked by auth)</li>
+<li><code>services/jeepney.js</code> — Removed dead <code>this.post(&#39;/state&#39;)</code> call that caused 404 + JSON parse errors</li>
+<li><code>pages/passenger.js</code> — Fixed <code>handleLoginSuccess()</code>: added <code>this.render()</code> + <code>App.updateWalletDisplay()</code>, removed non-existent <code>this.checkActiveState()</code> call</li>
+<li><code>routes/device-tokens.js</code> — Fixed crash: removed undefined <code>verifySession</code> from destructured params, read <code>userId</code> from <code>req.body</code></li>
+<li><code>server.js</code> — Fixed <code>HOST</code>/<code>PORT</code>/<code>scheme</code> variable scoping (were defined inside async IIFE but referenced outside)</li>
+</ul>
+<p><strong>Test results:</strong> 8/8 passing, ~15s runtime. Total test suite: 124 vitest API tests + 8 Playwright E2E browser tests.</p>
+<hr>
+<h1 id="phase-2-5-security-hardening-v2">Phase 2.5: Security Hardening v2 </h1>
+<h2 id="implementation-status">Implementation Status </h2>
+<p><strong>COMPLETED</strong> (2026-02-24)</p>
+<p>Total: <strong>+45 new tests</strong> (124 → 169 vitest tests) across 5 sub-phases.</p>
+<h3 id="sub-phase-2-5a-helmet-security-headers">Sub-Phase 2.5A: Helmet + Security Headers </h3>
+<ul>
+<li><code>helmet</code> middleware added (CSP disabled for inline scripts)</li>
+<li>Body size limit: <code>express.json({ limit: &#39;16kb&#39; })</code></li>
+<li>4 tests in <code>test/unit/security-headers.test.js</code></li>
+</ul>
+<p><strong>Files Changed:</strong></p>
+<ul>
+<li><code>server.js</code> — Added <code>helmet()</code> middleware, <code>express.json({ limit: &#39;16kb&#39; })</code></li>
+<li><code>package.json</code> — Added <code>helmet</code> dependency</li>
+</ul>
+<h3 id="sub-phase-2-5b-token-expiry-enforcement">Sub-Phase 2.5B: Token Expiry Enforcement </h3>
+<ul>
+<li><code>tokenExpiresAt DateTime?</code> added to User + Driver models</li>
+<li><code>SESSION_EXPIRY_HOURS: 24</code> now enforced (was defined but unused)</li>
+<li>Auth middleware checks expiry, returns <code>{ expired: true }</code> on 401</li>
+<li>Login routes set <code>tokenExpiresAt</code> on successful auth</li>
+</ul>
+<p><strong>Files Changed:</strong></p>
+<ul>
+<li><code>prisma/schema.prisma</code> — Added <code>tokenExpiresAt DateTime?</code> to User and Driver models</li>
+<li><code>middleware/auth.js</code> — Token expiry check added</li>
+<li><code>routes/auth.js</code> — Sets <code>tokenExpiresAt</code> on login</li>
+<li><code>routes/driver-auth.js</code> — Sets <code>tokenExpiresAt</code> on driver login</li>
+<li><code>config/constants.js</code> — <code>SESSION_EXPIRY_HOURS: 24</code> (enforcement wired up)</li>
+</ul>
+<p><strong>Tests:</strong> 3 integration tests in <code>test/integration/auth.test.js</code> (token expiry describe block)</p>
+<h3 id="sub-phase-2-5c-rbac-middleware">Sub-Phase 2.5C: RBAC Middleware </h3>
+<ul>
+<li><code>middleware/rbac.js</code>: <code>requireRole(...roles)</code> + <code>requireSelf(paramName)</code></li>
+<li>Applied <code>requireRole(&#39;admin&#39;)</code> to admin, drivers, jeepneys routes</li>
+<li>Applied <code>requireSelf(&#39;userId&#39;)</code> to wallet reload/deduct routes (admins bypass)</li>
+<li>Auth middleware now sets <code>req.userId</code> + <code>req.userRole</code> for downstream use</li>
+<li><code>seedAdmin()</code> helper added to test fixtures</li>
+</ul>
+<p><strong>Files Created:</strong></p>
+<ul>
+<li><code>middleware/rbac.js</code> — Role-based access control middleware</li>
+</ul>
+<p><strong>Files Changed:</strong></p>
+<ul>
+<li><code>middleware/auth.js</code> — Sets <code>req.userId</code> + <code>req.userRole</code></li>
+<li><code>routes/admin.js</code> — <code>requireRole(&#39;admin&#39;)</code> applied</li>
+<li><code>routes/drivers.js</code> — <code>requireRole(&#39;admin&#39;)</code> applied</li>
+<li><code>routes/jeepneys.js</code> — <code>requireRole(&#39;admin&#39;)</code> applied</li>
+<li><code>routes/wallet.js</code> — <code>requireSelf(&#39;userId&#39;)</code> applied (admins bypass)</li>
+<li><code>test/helpers/fixtures.js</code> — Added <code>seedAdmin()</code> helper</li>
+</ul>
+<p><strong>Tests:</strong> 9 unit tests in <code>test/unit/rbac.test.js</code>, 6 integration tests in <code>test/integration/admin-rbac.test.js</code></p>
+<h3 id="sub-phase-2-5d-account-lockout-input-validation">Sub-Phase 2.5D: Account Lockout + Input Validation </h3>
+<ul>
+<li><code>failedLoginAttempts Int @default(0)</code> + <code>lockedUntil DateTime?</code> on User + Driver</li>
+<li>Lockout after 5 failed attempts for 15 minutes (<code>MAX_LOGIN_ATTEMPTS</code>, <code>LOCKOUT_DURATION_MINUTES</code> in constants)</li>
+<li><code>express-validator</code> installed, <code>middleware/validate.js</code> with schemas for auth, wallet, seat endpoints</li>
+<li>Validation applied to register, login, driver-login, wallet reload/deduct, hopin</li>
+</ul>
+<p><strong>Files Created:</strong></p>
+<ul>
+<li><code>middleware/validate.js</code> — Input validation middleware with schemas</li>
+</ul>
+<p><strong>Files Changed:</strong></p>
+<ul>
+<li><code>prisma/schema.prisma</code> — Added <code>failedLoginAttempts Int @default(0)</code>, <code>lockedUntil DateTime?</code> to User and Driver</li>
+<li><code>config/constants.js</code> — Added <code>MAX_LOGIN_ATTEMPTS: 5</code>, <code>LOCKOUT_DURATION_MINUTES: 15</code></li>
+<li><code>routes/auth.js</code> — Validation + lockout logic applied</li>
+<li><code>routes/driver-auth.js</code> — Validation + lockout logic applied</li>
+<li><code>routes/wallet.js</code> — Validation applied to reload/deduct</li>
+<li><code>routes/seats.js</code> — <code>validateHopin</code> applied</li>
+<li><code>package.json</code> — Added <code>express-validator</code> dependency</li>
+</ul>
+<p><strong>Tests:</strong> 3 integration tests in <code>test/integration/lockout.test.js</code>, 16 unit tests in <code>test/unit/validation.test.js</code></p>
+<h3 id="sub-phase-2-5e-socket-io-authentication">Sub-Phase 2.5E: Socket.io Authentication </h3>
+<ul>
+<li><code>io.use()</code> middleware verifies token from <code>socket.handshake.auth</code></li>
+<li>Production: requires valid token+userId; Dev: allows unauthenticated for dev tools</li>
+<li>GPS rate limiting: max 1 update per second per socket</li>
+</ul>
+<p><strong>Files Changed:</strong></p>
+<ul>
+<li><code>server.js</code> — Socket.io auth middleware, GPS rate limiting</li>
+<li><code>package.json</code> — Added <code>socket.io-client</code> devDependency (for tests)</li>
+</ul>
+<p><strong>Tests:</strong> 4 integration tests in <code>test/integration/socket-auth.test.js</code></p>
+<h3 id="also-fixed">Also Fixed </h3>
+<ul>
+<li><code>test/global-setup.js</code> — Added <code>NODE_OPTIONS: &#39;--max-old-space-size=256&#39;</code> to child process, replaced child-process sleep with <code>Atomics.wait</code> for Neon cold start retry</li>
+</ul>
+<hr>
+<h3 id="testing-strategy-decision-2026-02-23">Testing Strategy Decision (2026-02-23) </h3>
+<p>Current test suite: <strong>124 vitest tests</strong> (54 integration + 70 unit) + <strong>8 Playwright E2E browser tests</strong>. Vitest integration tests run against Neon PostgreSQL (~5 min due to network latency). E2E tests run against a local server (~15s).</p>
+<p><strong>Strategy:</strong></p>
+<ol>
+<li><strong>Now:</strong> Keep existing 124 vitest tests + 8 E2E smoke tests as regression guard. No new comprehensive integration tests.</li>
+<li><strong>During human testing:</strong> Product flows will be finalized by real-user testing on devices. Behavior may change based on feedback.</li>
+<li><strong>Pre-launch:</strong> Once flows are cemented, write comprehensive integration tests to lock down finalized behavior.</li>
+<li><strong>Post-launch:</strong> Add regression tests for any production bugs.</li>
+</ol>
+<hr>
+<h2 id="phase-execution-order-revised-2026-02-24">Phase Execution Order (Revised 2026-02-24) </h2>
+<p>Optimized for <strong>least rework</strong> — each phase builds on the one before, avoiding costly retrofits.</p>
+<table><thead><tr><th>Order</th><th>Phase</th><th>Rationale</th></tr></thead><tbody><tr><td>✅ 1</td><td>Phase 0 (Refactor + Testing)</td><td>Foundation: clean codebase, tests, security basics</td></tr><tr><td>✅ 2</td><td>Phase 1 (Foundation Infra)</td><td>Neon PostgreSQL, CI/CD, graceful shutdown</td></tr><tr><td>✅ 3</td><td>Phase 2 (Mobile 2A–2H)</td><td>Capacitor native apps, GPS, BLE, push, E2E tests</td></tr><tr><td>✅ 4</td><td>**Phase 2.5 (Security Hardening v2)**</td><td>Helmet, RBAC, token expiry, lockout, validation, Socket.io auth — 185 tests</td></tr><tr><td>✅ 5</td><td>**Phase 3 (Friends & Notifications)**</td><td>Notification center + friend system — Phases 4-8 all send notifications, build infra once</td></tr><tr><td>✅ 6</td><td>**Phase 4 (Dagdag/Libre/Reserve)**</td><td>Feature expansion leveraging notifications + friend system</td></tr><tr><td>✅ 7</td><td>**Phase 5 (Compliance/KYC)**</td><td>kycLevel + wallet tiers + audit logging + ToS acceptance — 263 tests</td></tr><tr><td>✅ 8</td><td>**Phase 6 (Payments/Xendit)**</td><td>PaymentGateway facade, webhook handler, AMLA flags, auto-reload, driver cashout — 322 tests</td></tr><tr><td>✅ 9</td><td>**Phase 7 (Anti-Spoofing)**</td><td>TripConfidence scoring, disputes, admin review, trip history, login block — 357 tests</td></tr><tr><td>✅ 10</td><td>**Phase 8 (Revenue/Reconciliation)**</td><td>Convenience fees, revenue aggregation, reconciliation service, founders dashboard — 394 tests</td></tr><tr><td>✅ 11</td><td>**Phase 9 (UX/Branding)**</td><td>Design tokens, SVG icons, onboarding, empty states, skeletons, accessibility — 394 tests</td></tr><tr><td>✅ 12</td><td>**Phase 10 (Wallet/Earnings/API Versioning)**</td><td>Wallet history, driver earnings, v1 prefix aliasing, idempotency, offline queue — 427 tests</td></tr><tr><td>✅ 13</td><td>**Phase 11 (Multi-Trip/Offboard)**</td><td>Multi-trip state, TripLifecycle service, offboard monitor, driver logout — 427 tests</td></tr><tr><td>✅ 14</td><td>**Admin Auth + Sidebar**</td><td>Login gate, sidebar layout, role-based nav filtering, server logout — 427 vitest + 17 E2E</td></tr><tr><td>✅ 15</td><td>**Google OAuth**</td><td>Google Sign-In for passenger + admin login, mock mode for dev/test, account linking — 438 vitest + 17 E2E</td></tr><tr><td>✅ 16</td><td>**Phone OTP Login**</td><td>Phone-based OTP login for passengers + admins, Semaphore SMS, dev mock mode, auto-register — 454 vitest + 17 E2E</td></tr></tbody></table>
+<p><strong>Why this order:</strong> Doing Payments (Phase 6) before KYC (Phase 5) would require retrofitting tier enforcement into every payment endpoint. Doing KYC before Security (Phase 2.5) would require retrofitting RBAC into every admin page. This sequence ensures each layer is in place before the next one needs it.</p>
+<hr>
+<h1 id="phase-7-anti-spoofing-confidence-scoring-disputes">Phase 7: Anti-Spoofing — Confidence Scoring + Disputes </h1>
+<p>✅ <strong>COMPLETED</strong> (2026-02-24)</p>
+<h2 id="features-implemented">Features Implemented </h2>
+<h3 id="database-layer">Database Layer </h3>
+<h4 id="modify-prisma-schema-prisma-prisma-schema-prisma">[MODIFY] [prisma/schema.prisma](../prisma/schema.prisma) </h4>
+<ul>
+<li>Added <code>TripConfidence</code> model — per-trip confidence score (QR + GPS + Speed + BLE weighted sum)</li>
+<li>Added <code>Dispute</code> model — passenger dispute with auto-diagnosis, admin resolution workflow</li>
+<li>Added <code>confidence TripConfidence?</code> relation on Trip model</li>
+<li>Added <code>confidenceThreshold Float @default(75)</code> on SystemSettings</li>
+<li>Added <code>confidenceReviewFloor Float @default(40)</code> on SystemSettings</li>
+</ul>
+<h4 id="modify-config-constants-js-config-constants-js">[MODIFY] [config/constants.js](../config/constants.js) </h4>
+<ul>
+<li><code>CONFIDENCE_WEIGHTS: { QR: 50, GPS: 30, SPEED: 10, BLE: 10 }</code> — scoring component weights</li>
+<li><code>CONFIDENCE_THRESHOLD: 75</code> — high-confidence gate (no dispute allowed)</li>
+<li><code>CONFIDENCE_REVIEW_FLOOR: 40</code> — below this = likely_valid dispute</li>
+<li><code>SPOOF_MAX_JUMP_M: 500</code> — location jump detection threshold</li>
+<li><code>SPOOF_MAX_SPEED_KMH: 120</code> — impossible speed detection</li>
+<li><code>DISPUTE_CATEGORIES</code>, <code>DISPUTE_STATUSES</code>, <code>DISPUTE_RESOLUTIONS</code> — enum constants</li>
+<li><code>TRIP_HISTORY_LIMIT: 30</code></li>
+</ul>
+<h3 id="service-layer">Service Layer </h3>
+<h4 id="new-services-confidence-service-js-services-confidence-service-js">[NEW] [services/confidence-service.js](../services/confidence-service.js) </h4>
+<p>Factory: <code>createConfidenceService({ prisma, GeoService })</code></p>
+<ul>
+<li><code>scoreTrip(tripId)</code> — queries LocationLog, computes QR/GPS/Speed/BLE scores, detects spoof flags, creates TripConfidence record</li>
+<li><code>diagnoseDispute(tripId)</code> — returns <code>{ confidenceScore, recommendation, diagnosis }</code> (likely_bogus / needs_review / likely_valid)</li>
+<li><code>getSpoofFlags(tripId)</code> — returns parsed flags array from TripConfidence</li>
+</ul>
+<h3 id="backend-api">Backend API </h3>
+<h4 id="new-routes-disputes-js-routes-disputes-js">[NEW] [routes/disputes.js](../routes/disputes.js) </h4>
+<p>Passenger endpoints:</p>
+<ul>
+<li><code>POST /api/disputes</code> — File dispute (validates completed trip, user on trip, confidence &lt; threshold, no duplicate)</li>
+<li><code>GET /api/disputes/mine</code> — List user&#39;s disputes</li>
+</ul>
+<h4 id="new-routes-admin-disputes-js-routes-admin-disputes-js">[NEW] [routes/admin-disputes.js](../routes/admin-disputes.js) </h4>
+<p>Admin endpoints (requireRole(&#39;admin&#39;)):</p>
+<ul>
+<li><code>GET /api/admin/disputes</code> — List disputes with status filter, priority sort, pagination</li>
+<li><code>GET /api/admin/disputes/:id</code> — Detail with TripConfidence breakdown + LocationLogs</li>
+<li><code>POST /api/admin/disputes/:id/resolve</code> — Resolve (refund credits wallet + Transaction record)</li>
+</ul>
+<h4 id="modify-routes-trips-js-routes-trips-js">[MODIFY] [routes/trips.js](../routes/trips.js) </h4>
+<ul>
+<li>Added <code>GET /api/trips/history</code> — last 30 completed trips with confidenceScore, disputeStatus, canDispute</li>
+<li>Added fire-and-forget <code>ConfidenceService.scoreTrip()</code> in POST /end handler</li>
+</ul>
+<h4 id="modify-routes-auth-js-routes-auth-js">[MODIFY] [routes/auth.js](../routes/auth.js) </h4>
+<ul>
+<li>Added active-trip login block: 403 when user has seat with <code>heldAmount &gt; 0</code></li>
+</ul>
+<h4 id="modify-middleware-validate-js-middleware-validate-js">[MODIFY] [middleware/validate.js](../middleware/validate.js) </h4>
+<ul>
+<li>Added <code>validateDispute</code> and <code>validateDisputeResolve</code> schemas</li>
+</ul>
+<h4 id="modify-server-js-server-js">[MODIFY] [server.js](../server.js) </h4>
+<ul>
+<li>Instantiated ConfidenceService, added to ctx</li>
+<li>Mounted <code>/api/disputes</code> and <code>/api/admin/disputes</code></li>
+</ul>
+<h3 id="frontend">Frontend </h3>
+<h4 id="new-pages-admin-disputes-html-pages-admin-disputes-html-admin-disputes-js-pages-admin-disputes-js">[NEW] [pages/admin-disputes.html](../pages/admin-disputes.html) + [admin-disputes.js](../pages/admin-disputes.js) </h4>
+<ul>
+<li>Admin disputes dashboard with filter tabs (All/Open/In Review/Resolved/Rejected)</li>
+<li>Table: priority badge, category, confidence score (color-coded), recommendation, status, filed date</li>
+<li>Detail modal: score breakdown, spoof flags, GPS pulse count, reason, resolution form</li>
+</ul>
+<h4 id="modify-components-admin-header-js-components-admin-header-js">[MODIFY] [components/admin-header.js](../components/admin-header.js) </h4>
+<ul>
+<li>Added <code>{ id: &#39;disputes&#39;, label: &#39;Disputes&#39;, href: &#39;admin-disputes.html&#39; }</code> to navItems</li>
+</ul>
+<h3 id="tests-35-new-357-total">Tests (35 new → 357 total) </h3>
+<ul>
+<li><code>test/integration/confidence-scoring.test.js</code> — 16 tests (scoring engine, diagnosis tiers, spoof flags)</li>
+<li><code>test/integration/disputes.test.js</code> — 15 tests (file/reject/admin CRUD/resolve with refund/trip history)</li>
+<li><code>test/integration/active-trip-block.test.js</code> — 4 tests (login block lifecycle)</li>
+</ul>
+<hr>
+<h1 id="phase-8-revenue-reconciliation-founders-dashboard">Phase 8: Revenue, Reconciliation & Founders Dashboard </h1>
+<p>✅ <strong>COMPLETED</strong> (2026-02-25)</p>
+<h2 id="features-implemented">Features Implemented </h2>
+<h3 id="database-layer">Database Layer </h3>
+<h4 id="modify-prisma-schema-prisma-prisma-schema-prisma">[MODIFY] [prisma/schema.prisma](../prisma/schema.prisma) </h4>
+<ul>
+<li>Added <code>ConvenienceFee</code> model — per-transaction fee records (passenger boarding ₱1, driver settlement ₱0.20)</li>
+<li>Added <code>PlatformCost</code> model — operational cost tracking (Xendit fees, GCP, infrastructure, etc.)</li>
+<li>Added <code>ReconciliationReport</code> model — nightly balance audit results with category breakdown</li>
+<li>Added <code>passengerBoardingFee Float @default(1)</code> on SystemSettings — configurable passenger boarding fee</li>
+<li>Added <code>driverSettlementFeeRate Float @default(0.20)</code> on SystemSettings — configurable driver settlement fee rate</li>
+</ul>
+<h4 id="modify-config-constants-js-config-constants-js">[MODIFY] [config/constants.js](../config/constants.js) </h4>
+<ul>
+<li><code>PASSENGER_BOARDING_FEE: 1</code> — default ₱1</li>
+<li><code>DRIVER_SETTLEMENT_FEE_RATE: 0.20</code> — default ₱0.20 per ₱1 settled</li>
+<li><code>PLATFORM_COST_CATEGORIES: [&#39;xendit_gateway&#39;, &#39;gcp_compute&#39;, &#39;gcp_storage&#39;, &#39;sms&#39;, &#39;infrastructure&#39;, &#39;other&#39;]</code></li>
+<li><code>RECONCILIATION_THRESHOLDS: { CRITICAL: 0.01, WARNING: 0.05 }</code> — ₱0.01 critical, ₱0.05 warning variance</li>
+</ul>
+<h3 id="service-layer">Service Layer </h3>
+<h4 id="new-services-fee-service-js-services-fee-service-js">[NEW] [services/fee-service.js](../services/fee-service.js) </h4>
+<p>Factory: <code>createFeeService({ prisma, SystemSettings })</code></p>
+<ul>
+<li><code>calculatePassengerBoardingFee(tripId)</code> — returns <code>passengerBoardingFee</code> from SystemSettings</li>
+<li><code>calculateDriverSettlementFee(amount)</code> — returns <code>amount * driverSettlementFeeRate</code></li>
+<li><code>deductFees(passengerId, driverId, amount)</code> — atomically deduct fees from both, credit system wallet, record ConvenienceFee entries</li>
+<li><code>recordFee(type, amount, userId, tripId, reference)</code> — create ConvenienceFee log entry</li>
+</ul>
+<h4 id="new-services-revenue-service-js-services-revenue-service-js">[NEW] [services/revenue-service.js](../services/revenue-service.js) </h4>
+<p>Factory: <code>createRevenueService({ prisma, FeeService })</code></p>
+<ul>
+<li><code>getSummary(from, to, granularity)</code> — aggregated revenue by day/week/month (fees collected)</li>
+<li><code>getMetrics(from, to)</code> — revenue KPIs (total fees, avg per trip, passenger vs driver fees)</li>
+<li><code>exportCsv(from, to)</code> — CSV export of all ConvenienceFee records</li>
+<li><code>getNetRevenue(from, to)</code> — platform profit (fees collected − PlatformCost entries)</li>
+</ul>
+<h4 id="new-services-reconciliation-service-js-services-reconciliation-service-js">[NEW] [services/reconciliation-service.js](../services/reconciliation-service.js) </h4>
+<p>Factory: <code>createReconciliationService({ prisma, GeoService })</code></p>
+<ul>
+<li><code>runBalanceAudit()</code> — nightly job: sum all User + Driver wallets vs transaction ledger, create ReconciliationReport</li>
+<li><code>runIntegrityCheck()</code> — verify per-user computed balance matches stored balance, flag discrepancies</li>
+<li><code>getLatestReport()</code> — fetch most recent ReconciliationReport</li>
+<li><code>getReportHistory(days)</code> — last N days of reports with daily status</li>
+</ul>
+<h4 id="modify-services-payment-service-js-services-payment-service-js">[MODIFY] [services/payment-service.js](../services/payment-service.js) </h4>
+<ul>
+<li><code>settleSeat()</code> now deducts passenger boarding fee before crediting driver</li>
+<li><code>settleSeats()</code> now deducts driver settlement fee from total fare before disbursement</li>
+<li>Atomically creates ConvenienceFee records alongside Transaction records</li>
+</ul>
+<h3 id="backend-api">Backend API </h3>
+<h4 id="new-routes-admin-revenue-js-routes-admin-revenue-js">[NEW] [routes/admin-revenue.js](../routes/admin-revenue.js) </h4>
+<p>Admin-only endpoints (requireRole(&#39;admin&#39;)):</p>
+<ul>
+<li><code>GET /api/admin/revenue/summary?from=2026-01-01&amp;to=2026-01-31&amp;granularity=daily|weekly|monthly</code> — Revenue breakdown (fees by trip, daily/weekly/monthly rollup)</li>
+<li><code>GET /api/admin/revenue/metrics?from=2026-01-01&amp;to=2026-01-31</code> — KPIs (total fees, avg per trip, passenger vs driver split)</li>
+<li><code>GET /api/admin/revenue/export?from=2026-01-01&amp;to=2026-01-31</code> — CSV with all ConvenienceFee records</li>
+<li><code>GET /api/admin/revenue/net?from=2026-01-01&amp;to=2026-01-31</code> — Net revenue = fees − costs</li>
+</ul>
+<h4 id="new-routes-admin-reconciliation-js-routes-admin-reconciliation-js">[NEW] [routes/admin-reconciliation.js](../routes/admin-reconciliation.js) </h4>
+<p>Admin-only endpoints:</p>
+<ul>
+<li><code>POST /api/admin/reconciliation/run-balance-audit</code> — Trigger nightly balance audit (returns report)</li>
+<li><code>POST /api/admin/reconciliation/run-integrity-check</code> — Verify per-user balances (returns discrepancies)</li>
+<li><code>GET /api/admin/reconciliation/latest</code> — Fetch latest reconciliation report</li>
+<li><code>GET /api/admin/reconciliation/history?days=30</code> — Last 30 days of reports</li>
+</ul>
+<h4 id="new-routes-admin-costs-js-routes-admin-costs-js">[NEW] [routes/admin-costs.js](../routes/admin-costs.js) </h4>
+<p>Admin-only endpoints:</p>
+<ul>
+<li><code>POST /api/admin/costs</code> — Create cost entry (category, amount, description, date)</li>
+<li><code>GET /api/admin/costs?from=2026-01-01&amp;to=2026-01-31&amp;category=xendit_gateway</code> — List costs with optional filter</li>
+<li><code>GET /api/admin/costs/summary?from=2026-01-01&amp;to=2026-01-31</code> — Aggregate costs by category</li>
+<li><code>DELETE /api/admin/costs/:id</code> — Remove cost entry</li>
+</ul>
+<h4 id="modify-routes-settings-js-routes-settings-js">[MODIFY] [routes/settings.js](../routes/settings.js) </h4>
+<ul>
+<li>Added <code>passengerBoardingFee</code> and <code>driverSettlementFeeRate</code> to <code>ALLOWED_KEYS</code> for admin update endpoint</li>
+</ul>
+<h4 id="modify-routes-trips-js-routes-trips-js">[MODIFY] [routes/trips.js](../routes/trips.js) </h4>
+<ul>
+<li>Modified <code>POST /api/trip/end</code> to trigger <code>ReconciliationService.runBalanceAudit()</code> asynchronously (fire-and-forget)</li>
+</ul>
+<h4 id="modify-server-js-server-js">[MODIFY] [server.js](../server.js) </h4>
+<ul>
+<li>Instantiated FeeService, RevenueService, ReconciliationService and added to ctx</li>
+<li>Mounted <code>/api/admin/revenue</code>, <code>/api/admin/reconciliation</code>, <code>/api/admin/costs</code> routes</li>
+</ul>
+<h3 id="frontend">Frontend </h3>
+<h4 id="new-pages-admin-founders-html-pages-admin-founders-html-admin-founders-js-pages-admin-founders-js">[NEW] [pages/admin-founders.html](../pages/admin-founders.html) + [admin-founders.js](../pages/admin-founders.js) </h4>
+<ul>
+<li><strong>Revenue Dashboard:</strong> Line chart (daily/weekly/monthly fees), total card, breakdown (passenger vs driver)</li>
+<li><strong>Reconciliation Status:</strong> Daily balance audit results, break alerts (critical/warning), trend chart</li>
+<li><strong>Platform Metrics:</strong> Active routes, trips/day, signups, reload volume (KPI cards)</li>
+<li><strong>Fee Controls:</strong> Slider panels for passenger boarding fee + driver settlement fee rate (with live preview)</li>
+<li><strong>Cost Tracking:</strong> Form to log operational costs, category dropdown, list with delete buttons</li>
+<li><strong>Net Revenue:</strong> Calculation card (Jeepi fees − Xendit fees − GCP costs − other costs)</li>
+<li><strong>CSV Export:</strong> All reports exportable (revenue, costs, reconciliation)</li>
+</ul>
+<h4 id="modify-components-admin-header-js-components-admin-header-js">[MODIFY] [components/admin-header.js](../components/admin-header.js) </h4>
+<ul>
+<li>Added <code>{ id: &#39;founders&#39;, label: &#39;Founders&#39;, href: &#39;admin-founders.html&#39; }</code> to navItems</li>
+</ul>
+<h3 id="tests-37-new-394-total">Tests (37 new → 394 total) </h3>
+<ul>
+<li><code>test/integration/revenue.test.js</code> — 12 tests (fee calculation, settlement with fees, revenue aggregation, export)</li>
+<li><code>test/integration/reconciliation.test.js</code> — 15 tests (balance audit, integrity check, discrepancy detection, report history)</li>
+<li><code>test/integration/costs.test.js</code> — 10 tests (create, list, filter, summarize, delete)</li>
+</ul>
+<hr>
+<h1 id="phase-9-ux-polishing-branding">Phase 9: UX Polishing & Branding </h1>
+<p>✅ <strong>COMPLETE</strong> (2026-02-25)</p>
+<h2 id="sub-phases">Sub-Phases </h2>
+<h3 id="9a-design-tokens-css-component-classes">9A: Design Tokens + CSS Component Classes ✅ <span class="badge badge-completed">Completed</span></h3>
+<ul>
+<li>Added semantic CSS custom properties to <code>:root</code>: <code>--surface-*-light</code>, <code>--touch-target-min</code>, <code>--z-nav/modal/toast/fixed-bar</code></li>
+<li>Extracted 13 reusable component classes from inline styles: <code>.icon-circle</code>, <code>.card-gradient-primary</code>, <code>.action-circle</code> (3 sizes × 3 colors), <code>.progress-bar</code> segments, <code>.status-dot</code> variants, <code>.content-centered</code>, <code>.fixed-bottom-bar</code>, <code>.stat-label/.stat-value/.stat-subtitle</code>, <code>.badge-libre</code>, <code>.divider</code>, <code>.seat-status-header</code>, <code>.status-legend</code></li>
+<li>Replaced ~50 inline style attributes in <code>driver.js</code> and <code>passenger.js</code> with CSS classes</li>
+</ul>
+<h3 id="9b-svg-icon-library-dead-code-cleanup">9B: SVG Icon Library + Dead Code Cleanup ✅ <span class="badge badge-completed">Completed</span></h3>
+<ul>
+<li><strong>[NEW] <a href="../components/icons.js">components/icons.js</a></strong> — Centralized SVG icon library with 34 Lucide-style stroke icons (24×24 viewBox), <code>JeepiIcons.render(name, size)</code> API, <code>role=&quot;img&quot; aria-label</code> for accessibility</li>
+<li>Updated <code>admin-header.js</code> nav items to use <code>icon</code> property + <code>JeepiIcons.render()</code></li>
+<li>Replaced brand emoji (🚐) with inline SVG in passenger.html, driver.html, admin.html headers</li>
+<li>Added icons.js script tag to all 16 HTML files</li>
+<li>Updated <code>sw.js</code> cache (v6→v7), <code>cap-sync.js</code> shared assets</li>
+<li><strong>Dead code removed (~860 lines):</strong><ul>
+<li><code>components/seat-map.js</code> — entire file deleted (visual seat grid, replaced by seat-count model)</li>
+<li><code>components/payment-modal.js</code> — entire file deleted (per-seat payment selector, never called)</li>
+<li>~260 lines dead seat-map CSS in <code>index.css</code> (<code>.jeepney-container</code>, <code>.seat-grid</code>, <code>.seat</code>, etc.)</li>
+</ul>
+</li>
+</ul>
+<h3 id="9c-onboarding-empty-states-skeletons">9C: Onboarding + Empty States + Skeletons ✅ <span class="badge badge-completed">Completed</span></h3>
+<ul>
+<li><strong><code>.empty-state</code> component</strong> — standardized wrapper class replacing 10 different inline-styled empty state patterns across admin pages</li>
+<li><strong>Skeleton loaders</strong> — <code>@keyframes shimmer</code> + <code>.skeleton</code>, <code>.skeleton-text</code>, <code>.skeleton-card</code>, <code>.skeleton-stat</code> classes; admin dashboard uses skeleton grid during loading</li>
+<li><strong>Post-registration onboarding</strong> — 3-slide overlay in <code>passenger.js</code> (<code>showOnboarding()</code>): Scan QR → Cashless Fare → PARA PO signal; dot navigation, i18n (en + tl), skip/next/done buttons</li>
+<li><strong>i18n keys</strong> added to <code>en.js</code> and <code>tl.js</code>: <code>onboarding_1_title</code> through <code>onboarding_done</code></li>
+</ul>
+<h3 id="9d-passenger-driver-ux-polish">9D: Passenger & Driver UX Polish ✅ <span class="badge badge-completed">Completed</span></h3>
+<ul>
+<li><strong>Utility CSS classes</strong> — <code>.w-full</code>, <code>.card-centered</code>, <code>.font-semibold</code>, <code>.opacity-*</code>, <code>.text-sm/xs/2xl/3xl/4xl</code>, <code>.list-item</code>, <code>.selfie-box</code></li>
+<li><strong>Touch spring animation</strong> — <code>.action-circle:active { transform: scale(0.95) }</code> with cubic-bezier easing</li>
+<li>Replaced remaining critical emojis with <code>JeepiIcons.render()</code> + emoji fallback: 🛑→stop, 👍→accept, 💳→wallet, 🚐/🚌→jeepney, ⚙️→settings, 📍→routes</li>
+<li>Cleaned up inline styles in auth forms (selfie box, buttons, text sizing)</li>
+</ul>
+<h3 id="9e-accessibility-docs">9E: Accessibility + Docs ✅ <span class="badge badge-completed">Completed</span></h3>
+<ul>
+<li>SVG icons include <code>role=&quot;img&quot; aria-label</code> attributes</li>
+<li><code>@media (prefers-reduced-motion: reduce)</code> disables skeleton shimmer, onboarding animations, action circle spring</li>
+<li>Updated <code>docs/dev_estimates.md</code> and <code>docs/implementation_plan.md</code></li>
+</ul>
+<h3 id="9f-tutorial-feature-guide">9F: Tutorial Feature Guide ✅ <span class="badge badge-completed">Completed</span></h3>
+<ul>
+<li><strong>Passenger tutorial</strong> — 4-step card layout: Scan QR → Ride &amp; Track → PARA PO → Treat a Friend. Uses SVG icons with color-coded icon circles (blue/green/red/orange). Accessible from login screen (&quot;How it works&quot; link) and settings page.</li>
+<li><strong>Driver tutorial</strong> — 4-step card layout: Claim Jeepney → Accept Passengers → Handle PARA → Cash Out. Same visual style. Accessible from driver login screen and settings page.</li>
+<li><strong>Settings page integration</strong> — Context-aware tutorial links: shows passenger tutorial if passenger session exists, driver tutorial if driver session exists, generic fallback otherwise.</li>
+<li><strong>Tutorial CSS</strong> — <code>.tutorial-overlay</code>, <code>.tutorial-panel</code>, <code>.tutorial-steps</code>, <code>.tutorial-step</code>, <code>.tutorial-step__icon--*</code> color variants</li>
+<li><strong>i18n</strong> — Added <code>tutorial_how_it_works</code>, <code>tutorial_passenger_subtitle</code>, <code>tutorial_p1-p4_*</code>, <code>tutorial_driver_subtitle</code>, <code>tutorial_d1-d4_*</code>, <code>tutorial_got_it</code> keys to <code>en.js</code> and <code>tl.js</code></li>
+</ul>
+<h3 id="9g-playwright-e2e-orphaned-process-fix">9G: Playwright E2E Orphaned Process Fix ✅ <span class="badge badge-completed">Completed</span></h3>
+<ul>
+<li><strong>Problem:</strong> On Windows, when Playwright exits (Ctrl+C, crash), child <code>node server.js</code> process remains orphaned, holding the server port. <code>SIGTERM</code> does not propagate to child processes on Windows.</li>
+<li><strong>Fix 1 — Prevention:</strong> Added <code>SIGINT</code> handler to <code>server.js</code> alongside existing <code>SIGTERM</code>, so Ctrl+C triggers graceful shutdown (stops reservation matcher, closes server, disconnects Prisma).</li>
+<li><strong>Fix 2 — Recovery:</strong> Port sweep at config eval time in <code>playwright.config.js</code> — scans the server port (from <code>PORT</code> env var, default 5000) via <code>netstat</code>, kills stale <code>LISTENING</code> process via <code>taskkill</code>. Runs BEFORE Playwright starts <code>webServer</code> (Playwright&#39;s <code>globalSetup</code> runs AFTER <code>webServer</code>, so cannot be used for this).</li>
+<li><strong>Fix 3 — Tolerance:</strong> Changed <code>reuseExistingServer: true</code> → <code>!process.env.CI</code> — tolerant locally, strict in CI.</li>
+</ul>
+<h2 id="files-modified-phase-9-cumulative">Files Modified (Phase 9 cumulative) </h2>
+<table><thead><tr><th>File</th><th>Change</th></tr></thead><tbody><tr><td>`index.css`</td><td>+design tokens, −260 lines dead seat CSS, +component classes, +empty-state, +skeleton, +onboarding, +utility classes</td></tr><tr><td>`components/icons.js`</td><td>NEW — 34 SVG icons</td></tr><tr><td>`components/admin-header.js`</td><td>Icon-based nav items</td></tr><tr><td>`pages/passenger.js`</td><td>Inline→class migration, onboarding overlay, dead code removal</td></tr><tr><td>`pages/driver.js`</td><td>Inline→class migration, SVG icons, dead code removal</td></tr><tr><td>`pages/admin.js`</td><td>Skeleton loading, SVG dashboard icons</td></tr><tr><td>`pages/admin-*.js` (10 files)</td><td>`.empty-state` standardization</td></tr><tr><td>`locales/en.js`, `locales/tl.js`</td><td>Onboarding i18n keys</td></tr><tr><td>`passenger.html`, `driver.html`, `admin.html`</td><td>SVG brand icon, icons.js script, dead script removals</td></tr><tr><td>`pages/admin-*.html` (13 files)</td><td>icons.js script tag</td></tr><tr><td>`sw.js`</td><td>Cache v7, icons.js added, dead files removed</td></tr><tr><td>`scripts/cap-sync.js`</td><td>icons.js added, dead files removed</td></tr><tr><td>`pages/settings.js`</td><td>Context-aware tutorial links</td></tr><tr><td>`server.js`</td><td>SIGINT graceful shutdown handler</td></tr><tr><td>`playwright.config.js`</td><td>Port sweep at config eval, `reuseExistingServer: !process.env.CI`</td></tr><tr><td>`components/seat-map.js`</td><td>DELETED</td></tr><tr><td>`components/payment-modal.js`</td><td>DELETED</td></tr></tbody></table>
+<hr>
+<h1 id="phase-10-wallet-history-earnings-api-versioning-offline-resilience">Phase 10: Wallet History, Earnings, API Versioning & Offline Resilience </h1>
+<p>✅ <strong>COMPLETE</strong> (2026-02-25)</p>
+<h2 id="sub-phases">Sub-Phases </h2>
+<h3 id="10a-wallet-history">10A: Wallet History ✅ <span class="badge badge-completed">Completed</span></h3>
+<ul>
+<li><strong><code>GET /api/wallet/transactions</code></strong> — Paginated wallet transaction history with filtering by <code>type</code> (reload, deduct, fare, refund, etc.) and date range (<code>from</code>/<code>to</code> query params). Returns <code>{ transactions, total, page, pageSize }</code>.</li>
+<li><strong><code>services/wallet-history.js</code></strong> — Client-side WalletHistory modal component. Tap wallet balance to view transaction list with infinite scroll, type filters, and date range selectors.</li>
+<li>8 new tests</li>
+</ul>
+<h3 id="10b-driver-earnings">10B: Driver Earnings ✅ <span class="badge badge-completed">Completed</span></h3>
+<ul>
+<li><strong><code>GET /api/driver/wallet/earnings?period=today|week|month</code></strong> — Driver earnings summary with trip breakdown (fare collected, fees deducted, net earnings per trip) and period totals. Supports <code>today</code>, <code>week</code>, <code>month</code> period filters.</li>
+<li><strong>Earnings UI in <code>driver.js</code></strong> — Earnings summary card on driver dashboard showing period total, trip count, and fee deduction breakdown. Period selector (today/week/month) toggles displayed data.</li>
+<li>9 new tests</li>
+</ul>
+<h3 id="10c-api-versioning">10C: API Versioning ✅ <span class="badge badge-completed">Completed</span></h3>
+<ul>
+<li><strong><code>minAppVersion</code> field</strong> — Added to <code>SystemSettings</code> Prisma schema. Stores the minimum client app version required to use the API.</li>
+<li><strong><code>/api/v1/*</code> prefix aliasing</strong> — URL rewrite middleware strips <code>/api/v1/</code> → <code>/api/</code> so all existing routes are accessible at both <code>/api/endpoint</code> and <code>/api/v1/endpoint</code>. No route duplication needed.</li>
+<li><strong><code>GET /api/config</code></strong> — Public (unauthenticated) endpoint returning <code>{ minAppVersion, latestVersion }</code> for client version checking.</li>
+<li><strong><code>X-Jeepi-Version</code> header + 426 middleware</strong> — Middleware reads <code>X-Jeepi-Version</code> request header, compares against <code>minAppVersion</code> from SystemSettings, returns <code>426 Upgrade Required</code> if client version is below minimum.</li>
+<li><strong>Client version check in <code>api-url.js</code></strong> — <code>ApiUrl.getHeaders()</code> includes <code>X-Jeepi-Version</code> header. On 426 response, shows force-update blocking screen.</li>
+<li>9 new tests</li>
+</ul>
+<h3 id="10d-offline-resilience">10D: Offline Resilience ✅ <span class="badge badge-completed">Completed</span></h3>
+<ul>
+<li><strong><code>IdempotencyKey</code> model</strong> — New Prisma model storing <code>key</code> (unique), <code>response</code> (JSON), <code>statusCode</code>, <code>createdAt</code> with 24-hour TTL. Lazy cleanup deletes expired keys on each middleware invocation.</li>
+<li><strong>Idempotency middleware</strong> — Applied to <code>POST /seat/hopin</code>, <code>POST /seat/settle</code>, <code>POST /seat/para-request</code>, <code>POST /wallet/reload</code>. Client sends <code>X-Idempotency-Key</code> header; if key exists and hasn&#39;t expired, returns cached response without re-executing the handler.</li>
+<li><strong><code>services/offline-queue.js</code></strong> — IndexedDB-based offline request queue. When network is unavailable, queues POST requests with auto-generated idempotency keys. On reconnect, replays queue in FIFO order with exponential backoff.</li>
+<li><strong>Offline indicator UI</strong> — Network status banner in <code>passenger.html</code> and <code>driver.html</code>. Shows &quot;You are offline — requests will be queued&quot; when <code>navigator.onLine</code> is false; auto-hides on reconnect.</li>
+<li><strong>Client-side idempotency key generation</strong> — <code>jeepney.js</code> (boarding/para/settle) and <code>wallet.js</code> (reload) generate UUID idempotency keys for all mutating requests, ensuring safe retries on flaky connections.</li>
+<li>7 new tests</li>
+</ul>
+<h2 id="files-modified-phase-10-cumulative">Files Modified (Phase 10 cumulative) </h2>
+<table><thead><tr><th>File</th><th>Change</th></tr></thead><tbody><tr><td>`prisma/schema.prisma`</td><td>+IdempotencyKey model, +minAppVersion on SystemSettings</td></tr><tr><td>`middleware/idempotency.js`</td><td>NEW — Idempotency middleware with 24h TTL + lazy cleanup</td></tr><tr><td>`middleware/version-check.js`</td><td>NEW — X-Jeepi-Version header check, 426 Upgrade Required</td></tr><tr><td>`routes/wallet.js`</td><td>+GET /wallet/transactions (paginated, filterable)</td></tr><tr><td>`routes/driver-wallet.js`</td><td>+GET /driver/wallet/earnings (period breakdown)</td></tr><tr><td>`routes/config.js`</td><td>NEW — GET /api/config (public, minAppVersion + latestVersion)</td></tr><tr><td>`server.js`</td><td>+/api/v1/* URL rewrite middleware, +idempotency middleware on POST routes</td></tr><tr><td>`services/wallet-history.js`</td><td>NEW — Client-side WalletHistory modal component</td></tr><tr><td>`services/offline-queue.js`</td><td>NEW — IndexedDB offline request queue with replay</td></tr><tr><td>`services/api-url.js`</td><td>+X-Jeepi-Version header, +426 force-update handler</td></tr><tr><td>`services/jeepney.js`</td><td>+Idempotency key generation on boarding/para/settle</td></tr><tr><td>`services/wallet.js`</td><td>+Idempotency key generation on reload</td></tr><tr><td>`pages/driver.js`</td><td>+Earnings summary card UI with period selector</td></tr><tr><td>`passenger.html`</td><td>+Offline indicator banner</td></tr><tr><td>`driver.html`</td><td>+Offline indicator banner</td></tr></tbody></table>
+<hr>
+<h1 id="phase-11-multi-trip-refactor-offboard-monitor">Phase 11: Multi-Trip Refactor & Offboard Monitor </h1>
+<p><strong>Status:</strong> In Progress (2026-02-26)</p>
+<h2 id="overview">Overview </h2>
+<p>Refactors the single-trip assumption (<code>activeTrip</code> singleton) into a multi-trip model (<code>activeTrips</code> array), enabling multiple concurrent trips across different jeepneys. Adds a shared <code>TripLifecycle</code> service for consistent trip teardown, a driver logout endpoint, and a periodic offboard monitor for automatic passenger offboarding.</p>
+<h2 id="sub-phases">Sub-Phases </h2>
+<h3 id="11a-multi-trip-state-model">11A: Multi-Trip State Model </h3>
+<ul>
+<li><strong><code>services/state.js</code></strong> — Changed <code>findFirst</code> to <code>findMany</code> for active trips. State now returns <code>activeTrips</code> array instead of <code>activeTrip</code> singleton.</li>
+<li><strong>Driver enrichment</strong> — Each driver object in state includes <code>currentTripId</code> (the trip they&#39;re currently operating, or <code>null</code>).</li>
+<li><strong>Frontend migration</strong> — All <code>ACTIVE_TRIP</code> references replaced with <code>ACTIVE_TRIPS</code>. <code>getActiveTrip()</code> replaced with <code>getActiveTripForDriver(driverId)</code> and <code>getActiveTripForPassenger(passengerId)</code> helpers.</li>
+</ul>
+<h3 id="11b-triplifecycle-service">11B: TripLifecycle Service </h3>
+<ul>
+<li><strong><code>services/trip-lifecycle.js</code></strong> — NEW shared service with <code>endTripById(tripId, opts)</code>. Centralizes trip teardown: auto-settles unsettled seats, updates trip status to <code>completed</code>, broadcasts state updates.</li>
+<li><strong><code>routes/trips.js</code></strong> — <code>POST /api/trip/end</code> now delegates to <code>TripLifecycle.endTripById()</code> instead of inline logic.</li>
+</ul>
+<h3 id="11c-driver-logout-endpoint">11C: Driver Logout Endpoint </h3>
+<ul>
+<li><strong><code>routes/driver-auth.js</code></strong> — NEW <code>POST /api/driver/logout</code> endpoint. Ends the driver&#39;s active trip (via TripLifecycle), clears session token, disconnects Socket.io.</li>
+</ul>
+<h3 id="11d-admin-force-logout-enhancement">11D: Admin Force-Logout Enhancement </h3>
+<ul>
+<li><strong><code>routes/admin.js</code></strong> — <code>POST /api/admin/logout-user</code> now also ends the driver&#39;s active trip before clearing their session, preventing orphaned trips.</li>
+</ul>
+<h3 id="11e-offboard-monitor-service">11E: Offboard Monitor Service </h3>
+<ul>
+<li><strong><code>services/offboard-monitor.js</code></strong> — NEW periodic service that detects passenger GPS/BLE divergence from their trip&#39;s jeepney. Computes offboard confidence score based on GPS divergence (200m/2min threshold) and BLE signal loss. Auto-offboards passengers at high confidence; escalates to admin review at low confidence.</li>
+<li><strong><code>config/constants.js</code></strong> — New offboard threshold constants and trip lifecycle constants.</li>
+</ul>
+<h3 id="11f-server-infrastructure">11F: Server Infrastructure </h3>
+<ul>
+<li><strong><code>server.js</code></strong> — Socket.io auth for drivers, driver disconnect monitoring, stale trip sweep, offboard monitor integration.</li>
+<li><strong><code>services/payment-service.js</code></strong> — <code>autoSettleTrip()</code> now creates disputes for seats with no &quot;Para&quot; signal (no-Para seats) instead of silently settling them.</li>
+</ul>
+<h2 id="files-modified">Files Modified </h2>
+<table><thead><tr><th>File</th><th>Change</th></tr></thead><tbody><tr><td>`services/state.js`</td><td>findFirst→findMany, driver currentTripId enrichment</td></tr><tr><td>`services/trip-lifecycle.js`</td><td>NEW — shared endTripById() service</td></tr><tr><td>`services/offboard-monitor.js`</td><td>NEW — periodic offboard detection</td></tr><tr><td>`services/payment-service.js`</td><td>autoSettleTrip creates disputes for no-Para seats</td></tr><tr><td>`routes/driver-auth.js`</td><td>+POST /driver/logout endpoint</td></tr><tr><td>`routes/admin.js`</td><td>force-logout ends driver's active trip</td></tr><tr><td>`routes/trips.js`</td><td>POST /trip/end delegates to TripLifecycle</td></tr><tr><td>`server.js`</td><td>Socket.io driver auth, disconnect monitoring, stale sweep, offboard monitor</td></tr><tr><td>`config/constants.js`</td><td>+offboard thresholds, +trip lifecycle constants</td></tr><tr><td>`pages/driver.js`</td><td>ACTIVE_TRIP→ACTIVE_TRIPS, getActiveTripForDriver()</td></tr><tr><td>`pages/passenger.js`</td><td>ACTIVE_TRIP→ACTIVE_TRIPS, getActiveTripForPassenger()</td></tr></tbody></table>
+<hr>
+<h1 id="admin-auth-sidebar-layout">Admin Auth + Sidebar Layout </h1>
+<p>✅ <strong>COMPLETED</strong> (2026-02-26)</p>
+<h2 id="overview">Overview </h2>
+<p>Adds authentication gate to all 14 admin pages and replaces the horizontal nav tab bar with a fixed left sidebar. Includes role-based nav filtering (founder-only pages hidden from admin role), server-side logout, and 9 Playwright E2E tests.</p>
+<h2 id="sub-phases">Sub-Phases </h2>
+<h3 id="a-login-gate-components-admin-auth-js">A: Login Gate (`components/admin-auth.js`) </h3>
+<ul>
+<li><code>AdminAuth.require()</code> — checks localStorage for valid admin session. Shows login card if missing.</li>
+<li><code>AdminAuth.handleLogin()</code> — calls <code>POST /api/auth/login</code>, validates <code>role === &#39;admin&#39; || &#39;founder&#39;</code> client-side.</li>
+<li><code>AdminAuth.getHeaders()</code> — returns auth headers for protected API calls.</li>
+<li><code>AdminAuth.logout()</code> — calls <code>POST /api/auth/logout</code>, clears localStorage, reloads page.</li>
+</ul>
+<h3 id="b-sidebar-layout-components-admin-header-js">B: Sidebar Layout (`components/admin-header.js`) </h3>
+<ul>
+<li><code>AdminHeader.mount(activeTab)</code> creates fixed left sidebar (240px) with nav links, brand, admin name/role, logout button.</li>
+<li>Mobile: hamburger toggle with slide-in overlay + backdrop.</li>
+<li>Body gets <code>admin-layout</code> class for CSS flex layout.</li>
+</ul>
+<h3 id="c-role-based-nav-filtering">C: Role-Based Nav Filtering </h3>
+<ul>
+<li>Nav items can have <code>roles: [&#39;founder&#39;]</code> to restrict visibility.</li>
+<li>Founder-only: Founders, Audit, AMLA, Settings. All other items visible to both <code>admin</code> and <code>founder</code>.</li>
+</ul>
+<h3 id="d-server-side-logout-post-api-auth-logout">D: Server-Side Logout (`POST /api/auth/logout`) </h3>
+<ul>
+<li>Validates token matches <code>currentSessionToken</code> before clearing it.</li>
+<li>Added to publicPaths (does its own auth internally).</li>
+</ul>
+<h3 id="e-e2e-tests-test-e2e-admin-auth-spec-js">E: E2E Tests (`test/e2e/admin-auth.spec.js`) </h3>
+<ul>
+<li>9 tests: login gate, non-admin rejection, sidebar nav, logout, mobile hamburger, sub-page auth, admin role filtering, founder role filtering.</li>
+</ul>
+<h2 id="files-modified">Files Modified </h2>
+<table><thead><tr><th>File</th><th>Change</th></tr></thead><tbody><tr><td>`components/admin-auth.js`</td><td>NEW — login gate + session management</td></tr><tr><td>`components/admin-header.js`</td><td>Rewritten from horizontal nav to sidebar</td></tr><tr><td>`index.css`</td><td>+sidebar, login card, mobile responsive CSS</td></tr><tr><td>`admin.html` + 13 `pages/admin-*.html`</td><td>+admin-auth.js script, auth gate in DOMContentLoaded</td></tr><tr><td>`routes/auth.js`</td><td>+POST /api/auth/logout endpoint</td></tr><tr><td>`middleware/auth.js`</td><td>+/api/auth/logout to publicPaths, -/api/admin/sessions</td></tr><tr><td>`config/constants.js`</td><td>AUTH_RATE_LIMIT max: 5→20</td></tr><tr><td>`playwright.config.js`</td><td>+workers: 1, port sweep gated to CI only</td></tr><tr><td>6 admin JS files</td><td>AdminAuth.getHeaders() replaces old localStorage pattern</td></tr><tr><td>`test/e2e/admin-auth.spec.js`</td><td>NEW — 9 E2E tests</td></tr><tr><td>`test/e2e/admin.spec.js`</td><td>Updated to handle login gate</td></tr></tbody></table>
+<hr>
+<h1 id="google-oauth-sign-in-with-google">Google OAuth (Sign in with Google) </h1>
+<p>✅ <strong>COMPLETED</strong> (2026-02-26)</p>
+<h2 id="overview">Overview </h2>
+<p>Adds &quot;Sign in with Google&quot; to both passenger and admin login screens. Uses Google Identity Services (GSI) on client side + JWT verification via Google JWKS on server side. Dev/test environments use mock mode (no real Google credentials needed). Supports account linking for existing email/password users.</p>
+<h2 id="sub-phases">Sub-Phases </h2>
+<h3 id="a-schema-changes-prisma-schema-prisma">A: Schema Changes (`prisma/schema.prisma`) </h3>
+<ul>
+<li><code>googleId String? @unique</code> — Google &#39;sub&#39; claim for fast repeat login lookup.</li>
+<li><code>googleAvatar String?</code> — Google profile picture URL.</li>
+<li><code>authProvider String @default(&quot;local&quot;)</code> — &quot;local&quot; or &quot;google&quot;.</li>
+</ul>
+<h3 id="b-server-endpoint-post-api-auth-google">B: Server Endpoint (`POST /api/auth/google`) </h3>
+<ul>
+<li>Mock mode: <code>credential.startsWith(&#39;mock:&#39;)</code> in non-production → extracts email, skips JWT.</li>
+<li>Production: verifies JWT against Google JWKS via <code>services/google-token-verifier.js</code>.</li>
+<li>User lookup: by <code>googleId</code> → by <code>email</code> (links account) → creates new user.</li>
+<li>Respects lockout, active trip block, TOS acceptance.</li>
+<li>Bypasses multi-device approval (Google already verified identity).</li>
+<li>Force-logout existing socket sessions on re-login.</li>
+</ul>
+<h3 id="c-token-verifier-services-google-token-verifier-js">C: Token Verifier (`services/google-token-verifier.js`) </h3>
+<ul>
+<li>Zero external deps — uses <code>node:crypto</code> + <code>fetch</code>.</li>
+<li>Fetches Google JWKS (cached 1 hour), verifies RS256 signature, <code>iss</code>, <code>aud</code>, <code>exp</code>.</li>
+</ul>
+<h3 id="d-client-module-services-google-auth-js">D: Client Module (`services/google-auth.js`) </h3>
+<ul>
+<li><code>GoogleAuth.init()</code> — fetches <code>googleClientId</code> from <code>GET /api/config</code>, loads GSI script.</li>
+<li><code>GoogleAuth.renderButton(targetId, { onSuccess, onError })</code> — renders Google button or mock dev button.</li>
+<li>Mock mode: uses <code>App.showCodeEntry()</code> for email prompt.</li>
+</ul>
+<h3 id="e-ui-integration">E: UI Integration </h3>
+<ul>
+<li>Passenger login/register: auth divider + Google button below form.</li>
+<li>Admin login: auth divider + Google button, role check (admin/founder only).</li>
+<li>CSS: <code>.auth-divider</code> (centered &quot;or&quot; line), <code>.google-signin-btn</code> (dev button style).</li>
+<li>i18n: <code>auth_or</code>, <code>google_signin</code>, <code>google_signin_dev</code> keys in en.js + tl.js.</li>
+</ul>
+<h3 id="f-integration-tests-test-integration-google-auth-test-js">F: Integration Tests (`test/integration/google-auth.test.js`) </h3>
+<ul>
+<li>11 tests: new user, repeat login, account linking, session token, missing credential, TOS, lockout, active trip block, location logging, failed attempts reset, config endpoint.</li>
+</ul>
+<h2 id="files-modified">Files Modified </h2>
+<table><thead><tr><th>File</th><th>Change</th></tr></thead><tbody><tr><td>`prisma/schema.prisma`</td><td>+googleId, googleAvatar, authProvider on User</td></tr><tr><td>`routes/auth.js`</td><td>+POST /api/auth/google endpoint, +verifyGoogleToken import</td></tr><tr><td>`services/google-token-verifier.js`</td><td>NEW — JWT verification via Google JWKS</td></tr><tr><td>`services/google-auth.js`</td><td>NEW — client-side GSI wrapper + mock mode</td></tr><tr><td>`routes/config.js`</td><td>+googleClientId in config response</td></tr><tr><td>`middleware/auth.js`</td><td>+/api/auth/google to publicPaths</td></tr><tr><td>`server.js`</td><td>+rate limiter for /api/auth/google</td></tr><tr><td>`pages/passenger.js`</td><td>+Google button on login + register forms</td></tr><tr><td>`components/admin-auth.js`</td><td>+Google button on admin login</td></tr><tr><td>`passenger.html`</td><td>+google-auth.js script tag</td></tr><tr><td>`admin.html` + 13 `pages/admin-*.html`</td><td>+google-auth.js script tag, bumped admin-auth.js version</td></tr><tr><td>`index.css`</td><td>+.auth-divider, .google-signin-btn styles</td></tr><tr><td>`locales/en.js`, `locales/tl.js`</td><td>+auth_or, google_signin, google_signin_dev keys</td></tr><tr><td>`test/integration/google-auth.test.js`</td><td>NEW — 11 integration tests</td></tr></tbody></table>
+<hr>
+<h1 id="phone-otp-login-sign-in-with-phone">Phone OTP Login (Sign in with Phone) </h1>
+<p>✅ <strong>COMPLETED</strong> (2026-02-26)</p>
+<h2 id="overview">Overview </h2>
+<p>Adds phone-based OTP login to both passenger and admin login screens. Uses Semaphore SMS API for production delivery. Dev/test environments use mock mode (no SMS sent, fixed code <code>123456</code>). Auto-registers new users by phone number.</p>
+<h2 id="sub-phases">Sub-Phases </h2>
+<h3 id="a-schema-changes-prisma-schema-prisma">A: Schema Changes (`prisma/schema.prisma`) </h3>
+<ul>
+<li><code>User.phone</code> changed from <code>String?</code> to <code>String? @unique</code> for OTP phone lookup.</li>
+<li>PostgreSQL allows multiple NULLs in unique columns — safe for existing users without phone.</li>
+<li>Guest login changed to set <code>phone: null</code> instead of generating fake phone numbers.</li>
+</ul>
+<h3 id="b-otp-service-services-sms-otp-js">B: OTP Service (`services/sms-otp.js`) </h3>
+<ul>
+<li>In-memory OTP store: <code>Map&lt;phone, { code, expiresAt, attempts, lastSent }&gt;</code>.</li>
+<li>6-digit random code (crypto.randomInt), 10-minute expiry, 3 max verify attempts, 60-second resend cooldown.</li>
+<li>Dev mode (no <code>SEMAPHORE_API_KEY</code>): logs OTP to console, accepts <code>123456</code> as universal code.</li>
+<li>Production: sends SMS via Semaphore API (<code>https://api.semaphore.co/api/v4/messages</code>).</li>
+<li>Cleanup interval every 5 minutes for expired entries.</li>
+</ul>
+<h3 id="c-server-endpoints-routes-auth-js">C: Server Endpoints (`routes/auth.js`) </h3>
+<ul>
+<li><code>POST /api/auth/otp/send</code> — validates PH phone format, sends OTP, rate limited (5 req/min).</li>
+<li><code>POST /api/auth/otp/verify</code> — verifies code, finds/creates user by phone, issues session token.<ul>
+<li>Auto-register: new phone → creates user with <code>email: phone_09XXX@jeepi.local</code>, <code>authProvider: &quot;phone&quot;</code>.</li>
+<li>Respects lockout, active trip block, TOS acceptance.</li>
+<li>Bypasses multi-device approval (phone already verified).</li>
+<li>Force-logout existing socket sessions.</li>
+</ul>
+</li>
+</ul>
+<h3 id="d-client-module-services-phone-auth-js">D: Client Module (`services/phone-auth.js`) </h3>
+<ul>
+<li><code>PhoneAuth.renderButton(targetId, { onSuccess, onError })</code> — renders &quot;Sign in with Phone&quot; button.</li>
+<li>Two-step flow using <code>App.showCodeEntry()</code> modals: enter phone → enter code.</li>
+<li>Shows dev hint toast after OTP send in mock mode.</li>
+</ul>
+<h3 id="e-ui-integration">E: UI Integration </h3>
+<ul>
+<li>Passenger login/register: phone button below Google button.</li>
+<li>Admin login: phone button below Google button, role check (admin/founder only).</li>
+<li>CSS: <code>.phone-signin-btn</code> style (matches <code>.google-signin-btn</code> pattern).</li>
+<li>i18n: <code>phone_signin</code>, <code>phone_enter</code>, <code>phone_enter_code</code>, <code>otp_sent</code>, <code>otp_invalid</code>, <code>otp_expired</code>, <code>otp_dev_hint</code>.</li>
+</ul>
+<h3 id="f-seed-data">F: Seed Data </h3>
+<ul>
+<li>Admin users now have phone numbers (09190000001–09190000006).</li>
+<li>Both <code>services/seed.js</code> and <code>prisma/seed.js</code> updated.</li>
+<li><code>docs/seed_data.md</code> updated with admin phone column + OTP quick test flow.</li>
+</ul>
+<h3 id="g-integration-tests-test-integration-otp-auth-test-js">G: Integration Tests (`test/integration/otp-auth.test.js`) </h3>
+<ul>
+<li>16 tests: send to valid phone, invalid format, +63 format, missing phone, cooldown, auto-register, existing user login, wrong code, expired OTP, missing fields, session token validity, lockout, active trip block, TOS acceptance, location logging, guest phone null fix.</li>
+</ul>
+<h2 id="files-modified">Files Modified </h2>
+<table><thead><tr><th>File</th><th>Change</th></tr></thead><tbody><tr><td>`prisma/schema.prisma`</td><td>`phone String? @unique`</td></tr><tr><td>`services/sms-otp.js`</td><td>NEW — OTP store + Semaphore SMS</td></tr><tr><td>`services/phone-auth.js`</td><td>NEW — client-side phone auth UI</td></tr><tr><td>`routes/auth.js`</td><td>+OTP send/verify endpoints, +sms-otp import, guest phone→null</td></tr><tr><td>`routes/config.js`</td><td>+smsEnabled in config response</td></tr><tr><td>`config/constants.js`</td><td>+OTP_LENGTH, OTP_EXPIRY_MINUTES, OTP_MAX_ATTEMPTS, OTP_RESEND_COOLDOWN_SECONDS, SEMAPHORE_API_URL, OTP_RATE_LIMIT</td></tr><tr><td>`middleware/auth.js`</td><td>+/api/auth/otp/send, /api/auth/otp/verify to publicPaths</td></tr><tr><td>`server.js`</td><td>+OTP rate limiter (5 req/min)</td></tr><tr><td>`pages/passenger.js`</td><td>+phone-signin containers + PhoneAuth init</td></tr><tr><td>`components/admin-auth.js`</td><td>+phone-signin container + PhoneAuth init</td></tr><tr><td>`index.css`</td><td>+.phone-signin-btn styles</td></tr><tr><td>`passenger.html`</td><td>+phone-auth.js script tag</td></tr><tr><td>`admin.html` + 13 `pages/admin-*.html`</td><td>+phone-auth.js script tag</td></tr><tr><td>`locales/en.js`, `locales/tl.js`</td><td>+phone OTP i18n keys</td></tr><tr><td>`services/seed.js`</td><td>+admin phone numbers, phone in upsert</td></tr><tr><td>`prisma/seed.js`</td><td>+admin phone numbers</td></tr><tr><td>`docs/seed_data.md`</td><td>+admin phones, +OTP quick test flow</td></tr><tr><td>`test/integration/otp-auth.test.js`</td><td>NEW — 16 integration tests</td></tr></tbody></table>
+<hr>
+
+</main>
+
+</body>
+</html>

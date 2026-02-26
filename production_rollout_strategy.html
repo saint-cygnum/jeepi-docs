@@ -1,0 +1,1579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jeepi — Production Rollout Strategy</title>
+<style>
+/* ============ RESET & BASE ============ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; font-size: 16px; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  background: #f8fafc; color: #1e293b; line-height: 1.7;
+  display: flex; min-height: 100vh;
+}
+
+/* ============ COLOR PALETTE ============ */
+:root {
+  --primary: #2563eb; --primary-light: #dbeafe; --primary-dark: #1d4ed8;
+  --success: #16a34a; --success-light: #dcfce7; --success-dark: #15803d;
+  --warning: #d97706; --warning-light: #fef3c7; --warning-dark: #b45309;
+  --danger: #dc2626; --danger-light: #fee2e2; --danger-dark: #b91c1c;
+  --info: #0ea5e9; --info-light: #e0f2fe;
+  --bg: #f8fafc; --card: #ffffff; --border: #e2e8f0;
+  --text: #1e293b; --text-muted: #64748b; --text-light: #94a3b8;
+  --sidebar-bg: #0f172a; --sidebar-text: #cbd5e1; --sidebar-active: #2563eb;
+  --code-bg: #1e293b; --code-text: #e2e8f0;
+  --shadow: 0 1px 3px rgba(0,0,0,.1), 0 1px 2px rgba(0,0,0,.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0,0,0,.1), 0 4px 6px -4px rgba(0,0,0,.1);
+}
+
+/* ============ SIDEBAR NAV ============ */
+.sidebar {
+  position: fixed; top: 0; left: 0; width: 280px; height: 100vh;
+  background: var(--sidebar-bg); color: var(--sidebar-text);
+  overflow-y: auto; z-index: 100; padding: 1.5rem 0;
+  transition: transform .3s ease;
+}
+.sidebar::-webkit-scrollbar { width: 6px; }
+.sidebar::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+.sidebar-brand {
+  padding: 0 1.25rem 1.25rem; border-bottom: 1px solid #1e293b;
+  margin-bottom: 1rem;
+}
+.sidebar-brand h2 { color: #fff; font-size: 1.25rem; font-weight: 700; }
+.sidebar-brand p { color: var(--text-light); font-size: .8rem; margin-top: .25rem; }
+.sidebar nav { padding: 0 .75rem; }
+.sidebar nav a {
+  display: block; padding: .5rem .75rem; margin-bottom: 2px;
+  color: var(--sidebar-text); text-decoration: none; font-size: .82rem;
+  border-radius: 6px; transition: background .15s, color .15s;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sidebar nav a:hover { background: #1e293b; color: #fff; }
+.sidebar nav a .badge-sm {
+  display: inline-block; font-size: .65rem; padding: 1px 6px;
+  border-radius: 999px; margin-left: 6px; vertical-align: middle;
+  font-weight: 600;
+}
+.badge-green { background: var(--success); color: #fff; }
+.badge-amber { background: var(--warning); color: #fff; }
+.sidebar nav .nav-group-label {
+  display: block; padding: .6rem .75rem .25rem; color: var(--text-light);
+  font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+}
+
+/* ============ HAMBURGER (mobile) ============ */
+.hamburger {
+  display: none; position: fixed; top: 12px; left: 12px; z-index: 200;
+  background: var(--primary); color: #fff; border: none; border-radius: 8px;
+  width: 40px; height: 40px; font-size: 1.4rem; cursor: pointer;
+  box-shadow: var(--shadow);
+}
+.overlay {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5);
+  z-index: 99;
+}
+
+/* ============ MAIN CONTENT ============ */
+.main { margin-left: 280px; flex: 1; padding: 2.5rem 3rem 4rem; max-width: 960px; }
+
+/* ============ TYPOGRAPHY ============ */
+h1 { font-size: 2rem; font-weight: 800; color: var(--primary-dark); margin: 2.5rem 0 1rem; padding-bottom: .5rem; border-bottom: 3px solid var(--primary); }
+h2 { font-size: 1.45rem; font-weight: 700; color: var(--text); margin: 2rem 0 .75rem; }
+h3 { font-size: 1.15rem; font-weight: 600; color: #334155; margin: 1.5rem 0 .5rem; }
+h4 { font-size: 1rem; font-weight: 600; color: var(--text-muted); margin: 1rem 0 .4rem; }
+p, li { font-size: .95rem; }
+p { margin-bottom: .75rem; }
+a { color: var(--primary); }
+hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+
+/* ============ BADGES ============ */
+.badge {
+  display: inline-block; padding: 3px 12px; border-radius: 999px;
+  font-size: .78rem; font-weight: 700; vertical-align: middle;
+}
+.badge-completed { background: var(--success-light); color: var(--success-dark); }
+.badge-pending   { background: var(--warning-light); color: var(--warning-dark); }
+.badge-progress  { background: var(--info-light); color: #0369a1; }
+
+/* ============ CALLOUT BOXES ============ */
+.callout {
+  border-left: 4px solid; border-radius: 6px; padding: 1rem 1.25rem;
+  margin: 1rem 0; font-size: .9rem;
+}
+.callout-important { border-color: var(--warning); background: var(--warning-light); }
+.callout-note      { border-color: var(--info); background: var(--info-light); }
+
+/* ============ TABLES ============ */
+table {
+  width: 100%; border-collapse: collapse; margin: 1rem 0;
+  font-size: .88rem; background: var(--card); border-radius: 8px;
+  overflow: hidden; box-shadow: var(--shadow);
+}
+thead th {
+  background: var(--primary); color: #fff; padding: .75rem 1rem;
+  text-align: left; font-weight: 600; font-size: .82rem;
+  text-transform: uppercase; letter-spacing: .03em;
+}
+tbody td { padding: .65rem 1rem; border-bottom: 1px solid var(--border); }
+tbody tr:nth-child(even) { background: #f8fafc; }
+tbody tr:hover { background: var(--primary-light); }
+
+/* ============ CODE BLOCKS ============ */
+pre {
+  background: var(--code-bg); color: var(--code-text); border-radius: 8px;
+  padding: 1.25rem 1.5rem; overflow-x: auto; margin: 1rem 0;
+  font-size: .85rem; line-height: 1.6; box-shadow: var(--shadow);
+}
+code {
+  font-family: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', monospace;
+  font-size: .85em;
+}
+:not(pre) > code {
+  background: #f1f5f9; color: #be185d; padding: 2px 6px; border-radius: 4px;
+}
+
+/* ============ LISTS ============ */
+ul, ol { margin: .5rem 0 .75rem 1.5rem; }
+li { margin-bottom: .35rem; }
+li > ul, li > ol { margin-top: .25rem; }
+
+/* ============ RESPONSIVE ============ */
+@media (max-width: 900px) {
+  .sidebar { transform: translateX(-100%); }
+  .sidebar.open { transform: translateX(0); }
+  .overlay.open { display: block; }
+  .hamburger { display: flex; align-items: center; justify-content: center; }
+  .main { margin-left: 0; padding: 1.25rem 1rem 3rem; }
+  table { font-size: .8rem; }
+  thead th, tbody td { padding: .5rem .6rem; }
+  h1 { font-size: 1.5rem; }
+}
+
+/* ============ PRINT ============ */
+@media print {
+  .sidebar, .hamburger, .overlay { display: none !important; }
+  .main { margin-left: 0; padding: 0; max-width: 100%; }
+  pre { white-space: pre-wrap; word-break: break-all; }
+  body { font-size: 11pt; }
+}
+</style>
+</head>
+<body>
+
+<!-- Hamburger (mobile) -->
+<button class="hamburger" onclick="document.querySelector('.sidebar').classList.toggle('open');document.querySelector('.overlay').classList.toggle('open');">&#9776;</button>
+<div class="overlay" onclick="document.querySelector('.sidebar').classList.remove('open');this.classList.remove('open');"></div>
+
+<!-- Sidebar -->
+<aside class="sidebar">
+  <div class="sidebar-brand">
+    <h2>Jeepi Docs</h2>
+    <p>Production Rollout Strategy</p>
+  </div>
+  <nav>
+    <span class="nav-group-label">Jeepi Production Rollout Strategy</span>
+<a href="#context">Context</a>
+<a href="#phase-overview">Phase Overview</a>
+<a href="#architecture-target-state">Architecture (Target State)</a>
+<a href="#api-versioning-database-strategy">API Versioning & Database Strategy</a>
+<a href="#phase-0-codebase-refactor-testing-foundation-month-1">Phase 0: Codebase Refactor & Testin</a>
+<a href="#phase-1-foundation-months-2-3">Phase 1: Foundation (Months 2–3)</a>
+<a href="#phase-2-mobile-capacitor-js-months-4-6">Phase 2: Mobile — Capacitor.js (Mon</a>
+<a href="#phase-2-testing-strategy">Phase 2 Testing Strategy</a>
+<a href="#phase-3-compliance-kyc-documents-audit-months-7-9">Phase 3: Compliance — KYC, Document</a>
+<a href="#phase-4-payments-months-10-11">Phase 4: Payments (Months 10–11)</a>
+<a href="#phase-5-anti-spoofing-proximity-quorum-months-12-13">Phase 5: Anti-Spoofing — Proximity </a>
+<a href="#phase-6-revenue-model-founders-dashboard-months-14-15">Phase 6: Revenue Model & Founders D</a>
+<a href="#phase-7-friends-workflow-notification-center-parallel-with-phase-3-4">Phase 7: Friends Workflow & Notific</a>
+<a href="#phase-8-dagdag-bayad-libre-ka-jeepi-seat-reservation-parallel-with-phase-4-5">Phase 8: Dagdag Bayad, Libre Ka-Jee</a>
+<a href="#phase-9-ux-polishing-branding-parallel-with-phase-2-4">Phase 9: UX Polishing & Branding (P</a>
+<a href="#cross-cutting-concerns-woven-across-phases">Cross-Cutting Concerns (Woven Acros</a>
+<a href="#regulatory-compliance-checklist">Regulatory Compliance Checklist</a>
+<a href="#key-risk-register">Key Risk Register</a>
+<a href="#critical-files-to-modify">Critical Files to Modify</a>
+<a href="#open-questions-for-discussion">Open Questions for Discussion</a>
+
+  </nav>
+</aside>
+
+<!-- Main Content -->
+<main class="main">
+<h1 id="jeepi-production-rollout-strategy">Jeepi Production Rollout Strategy </h1>
+<p><strong>Date:</strong> February 2026 | <strong>Status:</strong> Planning</p>
+<hr>
+<h2 id="context">Context </h2>
+<p>Jeepi is a fully functional MVP for Philippine jeepney cashless payments. The system needs to evolve from a local monolith into a horizontally scalable, regulatory-compliant, production-grade platform. Four structural debts must be resolved before launch:</p>
+<ol>
+<li><strong>In-memory state</strong> (globalSettings, pendingLogins) cannot survive horizontal scaling (SQLite already replaced with Neon PostgreSQL)</li>
+<li><strong>Browser GPS/camera only</strong> — BLE and background GPS unavailable in PWA</li>
+<li><strong>No real payment gateway, audit trail, or regulatory compliance layer</strong></li>
+<li><strong>MVP prototype UI</strong> — needs professional branding, UX polish, and app store presence for user trust</li>
+</ol>
+<p>The goal is a GCP Cloud Run deployment capable of handling viral adoption, wrapped in a Capacitor mobile app (Android + iOS), with full Philippine regulatory compliance.</p>
+<hr>
+<h2 id="phase-overview">Phase Overview </h2>
+<table><thead><tr><th>Phase</th><th>Name</th><th>AI-Assisted</th><th>Human-Only</th><th>Key Unlock</th></tr></thead><tbody><tr><td>**0**</td><td>Codebase Refactor & Testing</td><td>2-3 weeks</td><td>5-7 weeks</td><td>Clean foundation for scaling</td></tr><tr><td>**1**</td><td>Foundation (DB + Infra)</td><td>6-8 weeks</td><td>12-16 weeks</td><td>Horizontal scaling</td></tr><tr><td>**2**</td><td>Mobile (Capacitor + BLE)</td><td>8-10 weeks</td><td>16-22 weeks</td><td>Limited pilot on device</td></tr><tr><td>**3**</td><td>Compliance (KYC + Audit)</td><td>7-9 weeks</td><td>14-20 weeks</td><td>Legal operation</td></tr><tr><td>**4**</td><td>Payments (Gateway + Xendit)</td><td>3-4 weeks</td><td>6-9 weeks</td><td>Real money</td></tr><tr><td>**5**</td><td>Anti-Spoofing (Quorum)</td><td>4-5 weeks</td><td>8-12 weeks</td><td>Fraud prevention</td></tr><tr><td>**6**</td><td>Revenue (Fees + Dashboard)</td><td>3-4 weeks</td><td>6-10 weeks</td><td>Business model</td></tr><tr><td>**7**</td><td>Friends & Notification Center</td><td>2-3 weeks (parallel)</td><td>5-7 weeks (parallel)</td><td>Social + actionable inbox</td></tr><tr><td>**8**</td><td>Dagdag Bayad / Libre Ka-Jeepi / Seat Reservation</td><td>5-6 weeks (parallel)</td><td>10-16 weeks (parallel)</td><td>Group payment + pre-booking</td></tr><tr><td>**9**</td><td>UX Polishing & Branding</td><td>2-3 weeks (parallel)</td><td>6-10 weeks (parallel)</td><td>Store-ready, trust</td></tr><tr><td></td><td>**With parallelism**</td><td>**~8-10 months**</td><td>**~16-21 months**</td><td></td></tr></tbody></table>
+<div class="callout callout-note">Detailed task-level estimates: [docs/dev_estimates.md](docs/dev_estimates.md)
+Code review findings & testing strategy: [docs/code_review_and_testing_strategy.md](docs/code_review_and_testing_strategy.md)
+Cross-cutting concerns (offline, DR, rate limiting, disputes, ToS, analytics, platform policy): §C.1–C.16 below</div>
+<p><strong>Launch Strategy:</strong> Phase 1 + Phase 2 together constitute the <strong>limited pilot milestone</strong> — a Capacitor app deployed to internal testers with simulated/manual payments. Phase 3 (compliance) runs in parallel with Phase 2 for the regulatory groundwork. Real money (Phase 4) goes live only after KYC tiers are enforced and BSP partner agreement is in place.</p>
+<p><strong>Key Milestones (AI-Assisted):</strong></p>
+<ul>
+<li><strong>Clean codebase:</strong> End of month 1 (Phase 0 complete)</li>
+<li><strong>Limited pilot:</strong> End of month 6 (Phase 1 + 2 complete)</li>
+<li><strong>Production launch:</strong> Month 10-11 (after Phase 4 Xendit live)</li>
+<li><strong>Full feature set:</strong> Month 12-13 (after Phase 5 + 6)</li>
+</ul>
+<pre><code class="lang-text">Month:  1    2    3    4    5    6    7    8    9   10   11   12   13
+        ├────┼────┼────┼────┼────┼────┼────┼────┼────┼────┼────┼────┤
+Ph 0    ██████                                                        Refactor+Test
+Ph 1         ████████████████                                         Foundation
+Ph 2                   ████████████████████████                       Mobile
+Ph 3                        ██████████████████████████                Compliance
+Ph 4                                            ████████             Payments
+Ph 5                                                 ████████████    Anti-Spoof
+Ph 6                                                      ████████  Revenue
+Ph 7                             ██████████                           Friends+Notif
+Ph 8                                            ████████████         Dagdag/Libre
+Ph 9                   ██████████                                     UX+Branding
+BSP     ◄────────────────── EMI License (6-12 months) ──────────────►
+Xendit                                   ▲ Approach        ▲ Keys
+                                       (month 8)        (month 10)
+        ──────────────────────────────────┬───────────────┬──────────
+                                   PILOT ▲         PROD ▲
+                                  (month 6)       (month 11)</code></pre>
+<hr>
+<h2 id="architecture-target-state">Architecture (Target State) </h2>
+<pre><code class="lang-text">CLIENTS
+┌────────────────┐  ┌────────────────┐  ┌──────────────┐
+│ Passenger App  │  │  Driver App    │  │  Admin Web   │
+│ Capacitor      │  │  Capacitor     │  │  PWA         │
+│ Android / iOS  │  │  Android / iOS │  │              │
+└───────┬────────┘  └───────┬────────┘  └──────┬───────┘
+        └───────────────────┼───────────────────┘
+                            ▼
+        ┌────────────────────────────────────────┐
+        │   Cloud Load Balancer + Cloud Armor    │
+        │   (DDoS, SSL termination, rate limits) │
+        └──────────┬──────────────┬──────────────┘
+                   ▼              ▼
+        ┌────────────────┐  ┌─────────────────┐  ┌──────────────────┐
+        │  jeepi-api     │  │ jeepi-realtime  │  │  Cloud Storage   │
+        │  Cloud Run     │  │ Cloud Run       │  │  + Cloud CDN     │
+        │  min:2 max:20  │  │ min:2 max:10    │  │  (Static assets) │
+        └───────┬────────┘  └───────┬─────────┘  └──────────────────┘
+                └──────────┬────────┘
+                           ▼
+              ┌─────────────────────────┐
+              │  Cloud Memorystore      │
+              │  Redis                  │
+              │  • Socket.io adapter    │
+              │  • globalSettings       │
+              │  • pendingLogins        │
+              │  • session token cache  │
+              └────────────┬────────────┘
+                           ▼
+              ┌─────────────────────────┐
+              │  Cloud SQL PostgreSQL   │
+              │  Primary + Read Replica │
+              │  + PgBouncer pooling    │
+              └─────────────────────────┘
+
+EXTERNAL
+┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐
+│  Xendit  │  │ Firebase │  │  LTFRB   │  │  BigQuery│
+│ Payments │  │   FCM    │  │  (future)│  │ Analytics│
+└──────────┘  └──────────┘  └──────────┘  └──────────┘</code></pre>
+<hr>
+<h2 id="api-versioning-database-strategy">API Versioning & Database Strategy </h2>
+<p>Detailed in <a href="docs/api_versioning_and_db_strategy.md">docs/api_versioning_and_db_strategy.md</a>. Key decisions:</p>
+<p><strong>API Versioning:</strong> URL-prefix (<code>/api/v1/</code>, <code>/api/v2/</code>). Additive changes (new fields, new endpoints) don&#39;t require a version bump. Breaking changes (renamed/removed fields, changed types) require a new version. Implemented in Phase 1 when routes are mounted behind Cloud Run.</p>
+<p><strong>Database Environments:</strong></p>
+<table><thead><tr><th>Environment</th><th>Engine</th><th>Purpose</th></tr></thead><tbody><tr><td>Local / CI</td><td>Neon Tech PostgreSQL (free tier)</td><td>Shared dev branches, PR previews</td></tr><tr><td>Staging / CI</td><td>Neon Tech PostgreSQL (free, Singapore)</td><td>Shared team testing, PR branch previews</td></tr><tr><td>Production</td><td>GCP Cloud SQL PostgreSQL (Singapore)</td><td>Live users, SLA, managed HA + backups</td></tr></tbody></table>
+<p><strong>Deployment:</strong> Blue-green via Cloud Run traffic splitting. Canary rollout (10% → 50% → 100%). Instant rollback by shifting traffic to previous revision (&lt;30 sec).</p>
+<p><strong>Migration Safety:</strong> Expand-contract pattern — never drop/rename columns in the same release that stops using them. Manual <code>down.sql</code> for every migration. Test against Neon branch copy before production deploy.</p>
+<hr>
+<h2 id="phase-0-codebase-refactor-testing-foundation-month-1">Phase 0: Codebase Refactor & Testing Foundation (Month 1) </h2>
+<p><strong>Goal:</strong> Clean up MVP technical debt, establish testing infrastructure, and create a solid foundation before scaling work begins. This phase addresses findings from the <a href="docs/code_review_and_testing_strategy.md">comprehensive code review</a>.</p>
+<p><strong>Why first:</strong> Phase 1 splits server.js into microservices. Splitting a 2468-line monolith with duplicated logic, security holes, and zero tests is far riskier than splitting clean, tested code. Phase 0 makes Phase 1 safer and faster.</p>
+<h3 id="0-1-security-hardening-critical-fix-before-any-production-exposure">0.1 Security Hardening (Critical — Fix Before Any Production Exposure) </h3>
+<ul>
+<li><strong>Password hashing:</strong> Replace plaintext password storage with bcrypt (server.js lines 393, 413, 615, 2117)</li>
+<li><strong>Session bypass fix:</strong> <code>verifySession</code> middleware returns <code>next()</code> when no token present — must return 401 (server.js lines 154-157)</li>
+<li><strong><code>/api/state</code> protection:</strong> Remove from public paths or strip sensitive fields (wallet balances, session tokens)</li>
+<li><strong>CORS origin whitelist:</strong> Replace <code>cors()</code> with explicit allowed origins</li>
+<li><strong>Rate limiting:</strong> Add <code>express-rate-limit</code> on auth, wallet, and booking endpoints</li>
+<li><strong>Remove test credentials:</strong> Hardcoded <code>password: &#39;password123&#39;</code> returned in API response (server.js line 487)</li>
+<li><strong>Input validation:</strong> Add middleware for coordinate bounds, positive amounts, string length limits</li>
+</ul>
+<h3 id="0-2-server-js-route-module-split">0.2 server.js Route Module Split </h3>
+<p>Split the 2468-line monolith into focused route modules:</p>
+<pre><code class="lang-text">server.js (2468 lines) →
+  routes/auth.js          (~235 lines)
+  routes/trips.js         (~200 lines)
+  routes/seats.js         (~700 lines → shrinks with PaymentService)
+  routes/routes.js        (~100 lines)
+  routes/drivers.js       (~240 lines)
+  routes/jeepneys.js      (~115 lines)
+  routes/wallet.js        (~75 lines)
+  routes/friends.js       (~225 lines)
+  routes/admin.js         (~100 lines)
+  middleware/auth.js       (~50 lines — verifySession)
+  middleware/validation.js (~100 lines — input validators)
+  server.js               (~200 lines — Express setup, middleware, Socket.io init)</code></pre>
+<h3 id="0-3-paymentservice-extraction">0.3 PaymentService Extraction </h3>
+<p>Consolidate 4x duplicated fare calculation and 3x duplicated balance validation into a single <code>services/payment-service.js</code>:</p>
+<ul>
+<li><code>calculateFare()</code> — single source of truth (replaces server.js 2x, geo.js 1x, payment-modal.js 1x)</li>
+<li><code>validateBalance()</code> — unified check (replaces hopin 1x, pay 1x, payment-modal.js 1x)</li>
+<li><code>holdBalance()</code> / <code>settlePayment()</code> — atomic Prisma transactions with proper locking</li>
+<li><code>createTransaction()</code> — unified logging (replaces pay, settle, reload, deduct)</li>
+<li><code>occupySeats()</code> — merge occupy + hopin logic</li>
+</ul>
+<h3 id="0-4-dead-code-removal">0.4 Dead Code Removal </h3>
+<ul>
+<li><strong>15 root scripts:</strong> Archive or delete check-<em>.js, fix-</em>.js, debug-<em>.js, verify-</em>.js, test-*.js</li>
+<li><strong>Duplicate routes:</strong> Delete lines 2294-2389 (second GET/POST <code>/api/routes</code> definition, never executes)</li>
+<li><strong>Duplicate trip check:</strong> Delete line 1239 (second <code>GET /api/trip/check</code>, never executes)</li>
+<li><strong>Legacy seat endpoints:</strong> Add deprecation comments to <code>/api/seat/occupy</code>, <code>/api/seat/update</code>, <code>/api/seat/pay</code></li>
+<li><strong>Dead service:</strong> Clean up <code>services/wallet.js</code> (calls non-existent endpoint)</li>
+</ul>
+<h3 id="0-5-code-quality-improvements">0.5 Code Quality Improvements </h3>
+<ul>
+<li>Replace 52 <code>console.log</code> instances with <code>pino</code> structured logging (levels, filtering, JSON output)</li>
+<li>Extract magic numbers to <code>constants.js</code> (base km = 4, proximity = 100m, min balance = 50, max seats = 20)</li>
+<li>Proper HTTP status codes (201, 204, 400, 401, 404, 409 — currently all return 200)</li>
+<li>Break long functions (hopin 190 lines, trip start ~200 lines) into smaller units</li>
+<li>Consolidate wallet sync to single mechanism (targeted <code>wallet_update</code> instead of full state broadcast)</li>
+</ul>
+<h3 id="0-6-testing-foundation">0.6 Testing Foundation </h3>
+<ul>
+<li>Install Vitest + Supertest + coverage tooling</li>
+<li>Create <code>test/setup.js</code> with test DB and Express app instance</li>
+<li><strong>Unit tests for GeoService</strong> (pure functions — haversine, fare calc, nearest stop, route distance)</li>
+<li><strong>Integration tests for payment flow</strong> (board → para → settle → correct balances)</li>
+<li><strong>Integration tests for auth</strong> (register, login, session enforcement, multi-device)</li>
+<li>Add <code>npm test</code> script, target ~60% coverage on business logic before Phase 1</li>
+</ul>
+<div class="callout callout-note">Full details: [Code Review, Testing Strategy & Payment API Unification](docs/code_review_and_testing_strategy.md)</div>
+<hr>
+<h2 id="phase-1-foundation-months-2-3">Phase 1: Foundation (Months 2–3) </h2>
+<p><strong>Goal:</strong> Make the monolith horizontally scalable on GCP.</p>
+<h3 id="1-1-service-split">1.1 Service Split </h3>
+<ul>
+<li>Split <code>server.js</code> into two Docker images:<ul>
+<li><strong><code>jeepi-api</code></strong>: Express REST routes only. No <code>io</code> object. Broadcasts trigger via Redis pub/sub (<code>broadcast:state-update</code> channel).</li>
+<li><strong><code>jeepi-realtime</code></strong>: Socket.io only. Subscribes to Redis pub/sub, calls <code>getState()</code>, emits to clients.</li>
+</ul>
+</li>
+<li>Static assets moved to Cloud Storage + CDN. Eliminate <code>startStaticServer()</code> from server.js.</li>
+</ul>
+<h3 id="1-2-database-neon-postgresql-dev-ci-cloud-sql-production">1.2 Database: Neon PostgreSQL (Dev/CI) + Cloud SQL (Production) </h3>
+<ul>
+<li><strong>Completed:</strong> <code>prisma/schema.prisma</code> uses <code>provider = &quot;postgresql&quot;</code> permanently. <code>services/db.js</code> uses <code>@prisma/adapter-pg</code> for all environments.</li>
+<li><strong>Dev/CI:</strong> Neon Tech free tier with branch-per-developer and branch-per-PR. <code>connect_timeout=15</code> for cold starts.</li>
+<li><strong>Production:</strong> GCP Cloud SQL with PgBouncer (<code>transaction</code> mode for API, <code>session</code> mode for realtime). <code>DATABASE_URL</code> from Secret Manager.</li>
+<li><strong>SystemSettings table</strong> added — replaces in-memory <code>globalSettings</code> object with single-row DB table + Redis write-through cache</li>
+</ul>
+<h3 id="1-3-redis-cloud-memorystore">1.3 Redis: Cloud Memorystore </h3>
+<ul>
+<li><code>globalSettings</code> → Redis hash <code>settings:global</code></li>
+<li><code>pendingLogins</code> Map → Redis keys <code>pending_login:{requestId}</code> with 5-min TTL</li>
+<li>Socket.io adapter: Install <code>@socket.io/redis-adapter</code>. Both services connect to same Redis instance.</li>
+<li>Session cache: <code>session:{userId}:{token}</code> with 24h TTL — eliminates per-request DB round-trip in <code>verifySession</code> middleware (server.js lines 159–174)</li>
+</ul>
+<h3 id="1-4-new-schema-models-add-in-phase-1">1.4 New Schema Models (Add in Phase 1) </h3>
+<pre><code class="lang-prisma">model SystemSettings { id String @id; key String; value Json }
+model Operator {
+  id, name, businessName, phone, email, password (hashed)
+  cpcNumber, status (pending/verified/suspended), kycLevel
+  jeepneys Jeepney[]
+}
+model DeviceToken { id, userId, driverId?, token, platform, createdAt }</code></pre>
+<h3 id="1-5-cloud-run-config">1.5 Cloud Run Config </h3>
+<ul>
+<li><strong>API</strong>: min:2, max:20, memory:512MB, concurrency:80, timeout:60s</li>
+<li><strong>Realtime</strong>: min:2, max:10, memory:1GB, concurrency:1000, timeout:3600s</li>
+<li><strong>CI/CD</strong>: Cloud Build → test → build → push to Artifact Registry → Prisma migrate (one-off job) → deploy → smoke test</li>
+<li><strong>Secrets</strong>: All API keys and DB passwords in Secret Manager. Never in .env files.</li>
+<li><strong>Domain</strong>: <code>api.jeepi.ph</code>, <code>ws.jeepi.ph</code>, <code>app.jeepi.ph</code>. Cloud Load Balancer handles TLS via Google-managed certs.</li>
+</ul>
+<h3 id="1-6-critical-file-changes">1.6 Critical File Changes </h3>
+<ul>
+<li><code>server.js</code> — globalSettings → Redis, pendingLogins → Redis, split into api/realtime services</li>
+<li><code>services/storage.js</code> — now uses same-origin detection (no hardcoded port); production domain via <code>JEEPI_SERVER_URL</code> or <code>api.jeepi.ph</code></li>
+<li><code>prisma/schema.prisma</code> — provider change + new models + Operator model</li>
+</ul>
+<hr>
+<h2 id="phase-2-mobile-capacitor-js-months-4-6">Phase 2: Mobile — Capacitor.js (Months 4–6) </h2>
+<div class="callout callout-note">**Sub-Phase 2A + 2B + 2C completed (2026-02-23):** Capacitor URL portability, contextual server-side logging, and Capacitor shell + build script are done. See details below after §2.5.</div>
+<h3 id="technology-decision-capacitor-js">Technology Decision: Capacitor.js ✅ <span class="badge badge-completed">Completed</span></h3>
+<p><strong>Verdict:</strong> Capacitor wraps the existing vanilla JS unchanged. Native plugins are injected as JS APIs. No rewrite needed. React Native would require a full rewrite of all 3 apps (passenger, driver, admin) with zero code reuse — unjustifiable given the existing codebase.</p>
+<table><thead><tr><th>Capability</th><th>PWA</th><th>Capacitor</th><th>React Native</th></tr></thead><tbody><tr><td>BLE Central (scan)</td><td>❌</td><td>✅ background iOS+Android</td><td>✅</td></tr><tr><td>Background GPS</td><td>❌ iOS</td><td>✅ Foreground Service (Android), Always (iOS)</td><td>✅</td></tr><tr><td>Push Notifications</td><td>Partial</td><td>✅ FCM/APNs</td><td>✅</td></tr><tr><td>Codebase reuse</td><td>100%</td><td>~95%</td><td>~0%</td></tr></tbody></table>
+<h3 id="2-1-capacitor-plugin-stack">2.1 Capacitor Plugin Stack </h3>
+<pre><code class="lang-text">@capacitor/core
+@capacitor/geolocation          — foreground + background GPS (15s passenger, 10s driver)
+@capacitor-community/bluetooth-le — BLE Central (scan only — see BLE design below)
+@capacitor/push-notifications   — FCM (Android) + APNs (iOS)
+@capacitor/local-notifications  — in-app payment alerts
+@capacitor/network              — offline detection
+@capacitor/status-bar           — native status bar theming</code></pre>
+<h3 id="2-2-gps-changes">2.2 GPS Changes </h3>
+<ul>
+<li>Replace <code>navigator.geolocation.watchPosition</code> in <code>services/gps.js</code> with <code>@capacitor/geolocation</code></li>
+<li>Android: <code>backgroundLocationUpdates</code> permission + Foreground Service (persistent notification)</li>
+<li>iOS: <code>NSLocationAlwaysAndWhenInUseUsageDescription</code> in Info.plist + &quot;always&quot; authorization</li>
+<li>iOS throttles background GPS to ~10–15s regardless — which is exactly the target pulse interval</li>
+<li>Pulse includes speed + heading from native GPS API</li>
+</ul>
+<h3 id="2-3-ble-design-driver-phone-as-ble-beacon">2.3 BLE Design — Driver Phone as BLE Beacon </h3>
+<p>The driver&#39;s phone broadcasts as a BLE Peripheral. This is feasible because the driver app must remain <strong>in the foreground for the entire trip</strong> — the driver actively uses it to:</p>
+<ul>
+<li>Accept passenger alighting requests</li>
+<li>Process Dagdag Bayad / Libre Ka-Jeepi payments</li>
+<li>Monitor seat map and trip state</li>
+</ul>
+<p>iOS only silences BLE advertising when the app goes to the <strong>background</strong> (screen locked, home pressed). Since the driver keeps the app active as a trip computer, BLE advertising is sustained on both Android and iOS throughout the trip. A <strong>screen wake lock</strong> is set on trip start to prevent accidental screen lock.</p>
+<ul>
+<li><strong>Driver app (Peripheral)</strong>: Advertises <code>service UUID: jeepi-{jeepneyId[0:8]}</code> with <code>{ tripId, driverId }</code> in manufacturer data. Started on <code>POST /api/trip/start</code>, stopped on <code>POST /api/trip/end</code>.</li>
+<li><strong>Passenger app (Central)</strong>: Scans for driver&#39;s BLE advertisement on boarding. Background BLE scanning works on both iOS and Android. Attaches <code>{ bleRssi, bleJeepneyId }</code> to GPS pulses.</li>
+<li><strong>No hardware cost</strong>: No additional devices needed per jeepney.</li>
+</ul>
+<h3 id="2-4-push-notifications">2.4 Push Notifications </h3>
+<ul>
+<li>Firebase Admin SDK in <code>jeepi-api</code></li>
+<li>Trigger: after <code>/api/seat/pay</code>, <code>/api/seat/para-request</code>, wallet top-up webhook</li>
+<li>Device tokens stored in <code>DeviceToken</code> table (see Phase 1 schema)</li>
+<li>Payload: amount, tripId, deep link to app screen</li>
+</ul>
+<h3 id="2-5-build-pipeline-distribution">2.5 Build Pipeline & Distribution </h3>
+<ul>
+<li><strong>Google Play Store</strong>: Cloud Build → signed AAB → Google Play via Fastlane</li>
+<li><strong>Apple App Store</strong>: Mac mini CI runner (Cloud Build doesn&#39;t support macOS) → Fastlane match → TestFlight → App Store</li>
+<li><strong>Sideloading (Android)</strong>: CI also produces a signed APK hosted at <code>app.jeepi.ph/download</code> for phones without Play Store access. Versioned with auto-update check on app launch.</li>
+<li><strong>OTA JS updates</strong>: Capacitor live update for HTML/JS changes (no store review needed). Native plugin changes still require store/sideload update.</li>
+</ul>
+<h3 id="2a-capacitor-url-portability-completed-2026-02-23">2A. Capacitor URL Portability (Completed 2026-02-23) </h3>
+<p>All hardcoded <code>localhost</code>/<code>/api</code> fetch calls replaced with dynamic URL resolution so the Capacitor native app can target any backend.</p>
+<ul>
+<li><code>services/api-url.js</code> — NEW. Detects Capacitor native context, reads <code>localStorage.JEEPI_SERVER_URL</code> or <code>window.JEEPI_SERVER_URL</code>, falls back to <code>window.location.origin</code>. Exports <code>JeepiConfig.getApiBase()</code> and <code>JeepiConfig.getWsUrl()</code>.</li>
+<li><code>services/jeepney.js</code> — Replaced hardcoded <code>/api</code> with <code>JeepiConfig.getApiBase()</code>.</li>
+<li><code>pages/passenger.js</code> — 8 hardcoded fetch calls fixed.</li>
+<li><code>pages/driver.js</code> — 2 hardcoded fetch calls fixed.</li>
+<li>9 HTML files — Service worker registration disabled when <code>window.Capacitor?.isNativePlatform()</code> is true.</li>
+<li>Frontend fetch calls (<code>jeepney.js</code>, <code>wallet.js</code>, <code>passenger.js</code>, <code>driver.js</code>) now send <code>X-Jeepi-Platform</code> and <code>X-Jeepi-Version</code> headers.</li>
+</ul>
+<h3 id="2b-contextual-server-side-logging-completed-2026-02-23">2B. Contextual Server-Side Logging (Completed 2026-02-23) </h3>
+<p>Structured lifecycle logging with request context enrichment and GCP Cloud Trace correlation.</p>
+<ul>
+<li><code>middleware/request-context.js</code> — NEW. Creates pino child logger per request with <code>userId</code>, <code>tripId</code>, <code>driverId</code>, <code>platform</code>, <code>appVersion</code>, <code>requestId</code>, and <code>logging.googleapis.com/trace</code> for Cloud Trace grouping.</li>
+<li><code>server.js</code> — CORS origins expanded for <code>capacitor://localhost</code> and <code>http://localhost</code>. <code>pinoHttp</code> serializer updated with password redaction. Socket lifecycle logs (connect, disconnect, join room).</li>
+<li>Route handlers (<code>auth.js</code>, <code>driver-auth.js</code>, <code>trips.js</code>, <code>seats.js</code>, <code>wallet.js</code>, <code>reservations.js</code>, <code>friends.js</code>, <code>admin.js</code>) — 31+ lifecycle log lines at state transitions.</li>
+<li><code>test/helpers/create-app.js</code> — Mounts <code>request-context</code> middleware for test parity.</li>
+</ul>
+<h3 id="2c-capacitor-shell-build-script-completed-2026-02-23">2C. Capacitor Shell + Build Script (Completed 2026-02-23) </h3>
+<p>Capacitor projects for passenger and driver apps with automated build/sync script. Old React Native stubs removed.</p>
+<ul>
+<li>Deleted <code>mobile/passenger-app/</code> and <code>mobile/driver-app/</code> (React Native stubs, 689MB unused <code>node_modules</code>).</li>
+<li>Socket.io client bundling — replaced <code>document.write()</code> dynamic loading in all 12 HTML files with static <code>&lt;script src=&quot;public/js/socket.io.min.js&quot;&gt;</code>. Copied from <code>node_modules/socket.io/client-dist/</code>. Works for both Express static serving and Capacitor local file context.</li>
+<li><code>mobile/passenger/</code> — Capacitor project (<code>ph.jeepi.passenger</code>). <code>@capacitor/core@7</code>, <code>@capacitor/android@7</code>, <code>@capacitor/ios@7</code>, <code>@capacitor/cli@7</code>. Android platform initialized. Uses <code>capacitor.config.json</code> (not .ts — avoids TypeScript dependency in vanilla JS project).</li>
+<li><code>mobile/driver/</code> — Capacitor project (<code>ph.jeepi.driver</code>, appName: <code>Jeepi Driver</code>). Same Capacitor 7 dependencies. Android platform initialized.</li>
+<li><code>scripts/cap-sync.js</code> — Build script. Copies ~32 frontend files to Capacitor <code>www/</code>, generates <code>config.js</code> (<code>JEEPI_SERVER_URL</code>, <code>JEEPI_APP_VERSION</code>), creates <code>index.html</code> redirect, injects <code>config.js</code> into HTML files, runs <code>npx cap sync</code>. Usage: <code>node scripts/cap-sync.js --app=passenger [--server=URL]</code>.</li>
+<li><code>.gitignore</code> — Added entries for <code>mobile/*/www/</code>, <code>mobile/*/android/</code>, <code>mobile/*/ios/</code>, <code>mobile/*/node_modules/</code>, <code>public/js/socket.io.min.js</code>.</li>
+<li><code>package.json</code> — Added npm scripts: <code>build:socketio</code>, <code>cap:sync:passenger</code>, <code>cap:sync:driver</code>, <code>cap:sync:all</code>.</li>
+</ul>
+<h3 id="2d-capacitor-geolocation-dual-mode-completed-2026-02-23">2D. Capacitor Geolocation Dual-Mode (Completed 2026-02-23) </h3>
+<p>Replaced <code>navigator.geolocation</code> with <code>@capacitor/geolocation</code> for native GPS on mobile, with web fallback.</p>
+<ul>
+<li><code>services/gps.js</code> — Dual-mode: uses Capacitor geolocation plugin when native, falls back to browser API on web. 15s interval for passengers, 10s for drivers.</li>
+<li><code>server.js</code> — Platform access policy: <code>services/gps.js</code> sends <code>X-Jeepi-Platform</code> header. Production mode restricts native-only features.</li>
+<li>Plugins: <code>@capacitor/geolocation@8</code> installed in both mobile projects.</li>
+</ul>
+<h3 id="2e-background-gps-wake-lock-completed-2026-02-23">2E. Background GPS + Wake Lock (Completed 2026-02-23) </h3>
+<p>Background GPS tracking via <code>@capgo/capacitor-background-geolocation</code> + <code>@capgo/capacitor-keep-awake</code> to prevent Android from killing GPS when app is backgrounded.</p>
+<ul>
+<li><code>services/gps.js</code> — Background geolocation starts alongside foreground, uses Android foreground service notification. Wake lock keeps CPU active during trips.</li>
+<li>Plugins: <code>@capgo/capacitor-background-geolocation@1</code>, <code>@capgo/capacitor-keep-awake@3</code> installed in both mobile projects.</li>
+</ul>
+<h3 id="2f-capacitor-8-upgrade-ble-proximity-completed-2026-02-23">2F. Capacitor 8 Upgrade + BLE Proximity (Completed 2026-02-23) </h3>
+<p>Upgraded Capacitor from 7 to 8 across both mobile projects. Added BLE proximity detection where driver phone advertises as BLE peripheral during trips and passenger scans for signal strength.</p>
+<ul>
+<li><strong>Capacitor 8 upgrade</strong>: <code>@capacitor/core@8</code>, <code>@capacitor/android@8</code>, <code>@capacitor/cli@8</code>, all plugins upgraded to v8-compatible versions.</li>
+<li><code>services/ble.js</code> — NEW. Client-side BLE service. Driver: advertises as <code>Jeepi-{jeepneyId}</code> via <code>@capgo/capacitor-bluetooth-low-energy@1.1.11</code>. Passenger: scans for nearby beacons, stores latest RSSI.</li>
+<li><code>pages/driver.js</code> — BLE advertising on startTrip/endTrip.</li>
+<li><code>pages/passenger.js</code> — BLE scanning on hop-in/stop, RSSI piggybacked on GPS pulses.</li>
+<li><code>prisma/schema.prisma</code> — Added <code>rssi Float?</code> to LocationLog model.</li>
+<li><code>server.js</code> — gps-update handler accepts <code>rssi</code> field.</li>
+</ul>
+<h3 id="2g-push-notifications-fcm-completed-2026-02-23">2G. Push Notifications — FCM (Completed 2026-02-23) </h3>
+<p>Firebase Cloud Messaging push notifications for offline/background user alerts. Gracefully disabled when Firebase env vars are not configured.</p>
+<p><strong>Server-side:</strong></p>
+<ul>
+<li><code>services/push-service.js</code> — NEW. Firebase Admin SDK wrapper. Initializes from <code>FIREBASE_PROJECT_ID</code>, <code>FIREBASE_CLIENT_EMAIL</code>, <code>FIREBASE_PRIVATE_KEY</code> env vars. No-op when vars missing. <code>sendToUser()</code> / <code>sendToUsers()</code> look up device tokens and send via <code>sendEachForMulticast()</code>. Auto-cleans stale tokens.</li>
+<li><code>routes/device-tokens.js</code> — NEW. <code>POST /api/device-token/register</code> (upsert), <code>DELETE /api/device-token/unregister</code>.</li>
+<li><code>prisma/schema.prisma</code> — Added <code>DeviceToken</code> model (userId, token, platform).</li>
+<li>Push triggers wired into: friend request received, reservation matched, fare settled.</li>
+</ul>
+<p><strong>Client-side:</strong></p>
+<ul>
+<li><code>services/push.js</code> — NEW. Requests permission, registers for FCM token, sends token to server. Foreground notifications bridged via <code>@capacitor/local-notifications</code>. <code>unregister()</code> called on logout.</li>
+<li>Plugins: <code>@capacitor/push-notifications@8</code>, <code>@capacitor/local-notifications@8</code> in both mobile projects.</li>
+<li>Server dependency: <code>firebase-admin</code> (conditional require, no-op if env vars missing).</li>
+</ul>
+<p><strong>Firebase Go-Live Checklist:</strong></p>
+<ol>
+<li>Create Firebase project at <a href="https://console.firebase.google.com">https://console.firebase.google.com</a></li>
+<li>Register Android apps: <code>ph.jeepi.passenger</code>, <code>ph.jeepi.driver</code></li>
+<li>Download <code>google-services.json</code> for each app → place in <code>mobile/*/android/app/</code></li>
+<li>Set 3 server env vars in Cloud Run / <code>.env</code>:<ul>
+<li><code>FIREBASE_PROJECT_ID</code></li>
+<li><code>FIREBASE_CLIENT_EMAIL</code></li>
+<li><code>FIREBASE_PRIVATE_KEY</code></li>
+</ul>
+</li>
+<li><code>.gitignore</code> should include: <code>google-services.json</code>, <code>*-service-account-key.json</code></li>
+<li>For iOS (future): register in Firebase, download <code>GoogleService-Info.plist</code> → place in Xcode project</li>
+</ol>
+<hr>
+<h2 id="phase-2-testing-strategy">Phase 2 Testing Strategy </h2>
+<p><strong>Current:</strong> 124 tests (54 integration + 70 unit) against Neon PostgreSQL. ~5 min CI due to network latency.</p>
+<p><strong>Decision (2026-02-23):</strong> Defer new comprehensive integration tests until product flows are finalized by human device testing. Rationale: flows will shift during user testing, making premature test coverage throwaway work. The existing 124 tests guard against regressions in core logic.</p>
+<p><strong>Timeline:</strong></p>
+<ol>
+<li><strong>Now:</strong> Existing tests as regression guard only.</li>
+<li><strong>Pre-launch:</strong> Cement finalized behavior with comprehensive tests.</li>
+<li><strong>Post-launch:</strong> Regression tests for production bugs.</li>
+<li><strong>Sub-Phase 2H:</strong> Replace Neon with local PG/PGlite for CI (target ~30s).</li>
+</ol>
+<hr>
+<h2 id="phase-3-compliance-kyc-documents-audit-months-7-9">Phase 3: Compliance — KYC, Documents, Audit (Months 7–9) </h2>
+<p><strong>⚠️ BSP EMI License:</strong> File application at Phase 1 start. Takes 6–12 months. Until granted, operate under Xendit&#39;s EMI license via stored-value partnership. This is the longest-lead regulatory item.</p>
+<h3 id="3-1-registration-flows">3.1 Registration Flows </h3>
+<p><strong>Passenger:</strong></p>
+<ol>
+<li>Name, email, phone, password + <strong>selfie capture</strong> (mandatory, anti-bot + identity anchor) → kycLevel 0 (wallet cap ₱500)</li>
+<li>Upload government ID (PhilSys, Passport, Driver&#39;s License, UMID, Voter ID) → pending review</li>
+<li>Admin approves (face match: selfie vs ID photo) → kycLevel 1 (wallet cap ₱50,000)</li>
+<li>Second ID or liveness check → kycLevel 2 (wallet cap ₱100,000 per BSP)</li>
+</ol>
+<div class="callout callout-note">**Why selfie at registration:** (a) Proves the user is a real person, not a bot or duplicate account. (b) Serves as the identity anchor for all subsequent ID verification — admin compares selfie to uploaded gov't ID photo. (c) Required for student discount verification (school ID photo match). (d) Stored in Cloud Storage `jeepi-kyc-documents/users/{userId}/selfie/` — same encryption as KYC docs.</div>
+<p><strong>Driver:</strong></p>
+<ol>
+<li>Name, username, phone, password + <strong>selfie capture</strong> (mandatory) + Professional Driver&#39;s License (PDL) upload → pending</li>
+<li>NBI Clearance upload (required before first active trip)</li>
+<li>Admin verifies face match (selfie vs PDL photo) + must be linked to a verified Operator</li>
+</ol>
+<p><strong>Operator:</strong></p>
+<ol>
+<li>Business name (or individual name for owner-operators), contact, LTFRB CPC number + LTO OR/CR for each vehicle</li>
+<li>DTI/SEC registration (corporations) or sole proprietorship docs (owner-operators) + Mayor&#39;s permit</li>
+<li>Approved by Jeepi compliance team before any jeepney can be activated</li>
+</ol>
+<div class="callout callout-note">**Owner-Operator:** A driver may also register as an Operator for their own jeepney. One person holds both a Driver account and an Operator account linked to the same vehicle. Driver account is used during trips; Operator account manages fleet documents and franchise compliance.</div>
+<h3 id="3-2-document-storage">3.2 Document Storage </h3>
+<ul>
+<li>Cloud Storage bucket <code>jeepi-kyc-documents</code> (private, never public)</li>
+<li>Path: <code>/users/{userId}/{docType}/{uuid}.jpg</code></li>
+<li>Encryption: CMEK via Cloud KMS</li>
+<li>Access: Signed URLs (15-min expiry) for upload and admin review only</li>
+<li>DB stores metadata only (no URLs, just the GCS object key)</li>
+</ul>
+<pre><code class="lang-prisma">model KycDocument {
+  id, userId?, driverId?, operatorId?
+  documentType  // selfie, philsys, passport, pdl, cpc, or_cr, student_id, osca_id, pwd_id
+  storageKey    // GCS object path
+  status        // pending, approved, rejected
+  reviewedBy, reviewNote, uploadedAt, reviewedAt
+}</code></pre>
+<h3 id="3-3-wallet-tiers-enforce-at-api-level">3.3 Wallet Tiers (enforce at API level) </h3>
+<pre><code class="lang-text">kycLevel 0: max wallet ₱500, max single reload ₱500
+kycLevel 1: max wallet ₱50,000, max single ₱10,000
+kycLevel 2: max wallet ₱100,000 (BSP e-money limit)</code></pre>
+<p>Enforced in: <code>POST /api/wallet/reload/initiate</code> and <code>POST /api/seat/hop-in</code></p>
+<h3 id="3-4-admin-kyc-queue-new-admin-page">3.4 Admin KYC Queue (New Admin Page) </h3>
+<ul>
+<li>Queue of pending KYC documents, sorted by upload date</li>
+<li>Document viewer with signed GCS URL (15-min expiry)</li>
+<li>Actions: Approve / Reject with mandatory note → AuditLog entry</li>
+<li>Role-based: senior admins approve drivers/operators; junior admins approve passenger IDs only</li>
+</ul>
+<h3 id="3-5-audit-logging">3.5 Audit Logging </h3>
+<pre><code class="lang-prisma">model AuditLog {
+  id, actorId, actorType (passenger/driver/admin/system)
+  action      // e.g. "kyc.approve", "wallet.reload", "trip.start"
+  entityType, entityId
+  metadata    Json   // before/after values, amounts
+  ipAddress, userAgent
+  lat?, lng?  // if mobile-initiated
+  timestamp
+
+  @@index([actorId, timestamp])
+  @@index([action, timestamp])
+  @@index([entityType, entityId])
+}</code></pre>
+<p><strong>Events captured:</strong> auth, wallet, trip, seat/boarding, KYC, admin actions, settings changes, payment webhooks.</p>
+<p><strong>Retention:</strong> 90-day hot (PostgreSQL) → nightly Cloud Scheduler exports to Cloud Storage as gzipped JSONL. Standard→Nearline→Coldline. BSP requires 5-year financial record retention.</p>
+<h3 id="3-6-data-privacy-act-ra-10173-compliance">3.6 Data Privacy Act (RA 10173) Compliance </h3>
+<ul>
+<li>Designate DPO, register with NPC within 30 days of processing sensitive data</li>
+<li>Privacy Impact Assessment filed with NPC (covers: ID images, GPS history, payment history, biometric/selfie, social graph)</li>
+<li>Privacy Policy v1.0 shown + accepted at registration</li>
+<li>Right to erasure: cascade-delete personal data (retain anonymized financial records for BSP)</li>
+<li><code>analyticsOptOut Boolean @default(false)</code> on User model for data monetization</li>
+</ul>
+<hr>
+<h2 id="phase-4-payments-months-10-11">Phase 4: Payments (Months 10–11) </h2>
+<h3 id="4-1-payment-gateway-abstraction-layer-paymentgateway-facade">4.1 Payment Gateway Abstraction Layer (PaymentGateway Facade) </h3>
+<p>Xendit is the <strong>launch gateway</strong>, but Jeepi must not be coupled to a single provider. Future possibilities include direct GCash/Maya API integration (lower fees), Apple Pay / Google Pay, DragonPay, or a second aggregator for redundancy. The architecture must make switching or adding gateways a configuration change, not a rewrite.</p>
+<pre><code class="lang-text">┌─────────────────────────────────────────────────────────┐
+│                    PaymentGateway (Facade)               │
+│                                                          │
+│  createCharge(amount, method, userId, idempotencyKey)    │
+│  createDisbursement(amount, method, driverId)            │
+│  verifyWebhook(headers, body) → { valid, event }        │
+│  getBalance() → { available, pending }                   │
+│  tokenizeCard(cardDetails) → tokenId                     │
+│  chargeToken(tokenId, amount) → chargeResult             │
+│  getChargeStatus(chargeId) → status                      │
+│  generateReport(dateRange) → CSV                         │
+└──────────────┬──────────────────────┬────────────────────┘
+               │                      │
+    ┌──────────▼──────────┐ ┌────────▼────────────┐ ┌────────────────────┐
+    │  XenditAdapter      │ │  QRPhAdapter        │ │  FutureAdapters    │
+    │  (launch gateway)   │ │  (zero-fee)         │ │                    │
+    │                     │ │                     │ │  GCashDirect,      │
+    │  - eWallet API      │ │  - Generate QR Ph   │ │  MayaDirect,       │
+    │  - Invoice API      │ │  - InstaPay webhook │ │  ApplePay,         │
+    │  - Disbursement API │ │  - BSP PSP rails    │ │  GooglePay,        │
+    │  - BancNet API      │ │                     │ │  PayMongo,         │
+    │  - Report API       │ │                     │ │  DragonPay         │
+    └─────────────────────┘ └─────────────────────┘ └────────────────────┘</code></pre>
+<p><strong>Implementation:</strong></p>
+<pre><code class="lang-javascript">// services/payment-gateway.js — facade
+class PaymentGateway {
+  constructor(adapter) { this.adapter = adapter; }
+
+  async createCharge({ amount, currency, method, userId, idempotencyKey, description }) {
+    return this.adapter.createCharge({ amount, currency, method, userId, idempotencyKey, description });
+    // Returns: { chargeId, checkoutUrl, status, provider }
+  }
+
+  async createDisbursement({ amount, currency, method, recipientId, accountDetails }) {
+    return this.adapter.createDisbursement({ amount, currency, method, recipientId, accountDetails });
+    // Returns: { disbursementId, status, provider, estimatedArrival }
+  }
+
+  async verifyWebhook(headers, body) {
+    return this.adapter.verifyWebhook(headers, body);
+    // Returns: { valid, eventType, chargeId, amount, metadata }
+  }
+
+  async getBalance() {
+    return this.adapter.getBalance();
+    // Returns: { available, pending, currency }
+  }
+
+  // ... tokenizeCard, chargeToken, getChargeStatus, generateReport
+}
+
+// services/adapters/xendit-adapter.js
+class XenditAdapter {
+  async createCharge({ amount, method, userId, idempotencyKey }) {
+    if (['gcash', 'maya', 'grabpay'].includes(method)) {
+      return this._createEWalletCharge(...);
+    } else if (['credit_card', 'debit_card', 'bancnet'].includes(method)) {
+      return this._createInvoice(...); // Xendit Invoice handles cards + BancNet
+    } else if (['instapay', 'pesonet'].includes(method)) {
+      return this._createBankTransfer(...);
+    } else {
+      return this._createOTCPayment(...); // 7-Eleven, Cebuana, M Lhuillier
+    }
+  }
+}
+
+// services/adapters/qrph-adapter.js (post-launch, zero fees)
+class QRPhAdapter {
+  async createCharge({ amount, userId, idempotencyKey }) {
+    // Generate dynamic QR Ph code via BSP-approved PSP
+    // Passenger scans with ANY PH banking app → InstaPay credit → webhook
+    return { chargeId, qrCodeData, status: 'pending', provider: 'qrph' };
+  }
+}</code></pre>
+<p><strong>Rules:</strong></p>
+<ul>
+<li>No API route ever calls Xendit directly. All payment operations go through <code>PaymentGateway</code>.</li>
+<li>The <code>Transaction</code> model stores <code>provider</code> (e.g., <code>&quot;xendit&quot;</code>, <code>&quot;gcash_direct&quot;</code>) and <code>providerChargeId</code> (not Xendit-specific).</li>
+<li>Webhook handler routes by provider: <code>POST /api/webhooks/xendit</code>, <code>POST /api/webhooks/gcash</code>, etc. — all call <code>PaymentGateway.verifyWebhook()</code>.</li>
+<li>Adapter selection is configured via <code>globalSettings.paymentProvider</code> (default: <code>&quot;xendit&quot;</code>). Can be per-method in future (e.g., GCash direct for e-wallets, Xendit for cards).</li>
+</ul>
+<p><strong>Why this matters:</strong></p>
+<ul>
+<li><strong>Lower fees later:</strong> Direct GCash API integration is ~1.5% vs Xendit&#39;s 2.3%. At scale, that difference is significant.</li>
+<li><strong>Redundancy:</strong> If Xendit has an outage, switch to a backup gateway without code changes.</li>
+<li><strong>Apple Pay / Google Pay:</strong> These have their own SDKs. Adding them is a new adapter, not a rewrite.</li>
+<li><strong>Regulatory:</strong> BSP may require multiple payment channels for consumer protection.</li>
+</ul>
+<h3 id="4-2-one-time-top-up-flow">4.2 One-Time Top-Up Flow </h3>
+<ol>
+<li>User selects amount + method in app (GCash, Maya, debit/credit, bank transfer)</li>
+<li><code>POST /api/wallet/reload/initiate</code> → API calls <code>PaymentGateway.createCharge()</code></li>
+<li>Gateway returns checkout URL → Capacitor opens in in-app browser</li>
+<li>User completes payment on provider&#39;s checkout page</li>
+<li>Provider webhook → <code>POST /api/webhooks/{provider}</code> → <code>PaymentGateway.verifyWebhook()</code> (verify signature)</li>
+<li>Credit wallet, create Transaction (with <code>provider</code> field), emit <code>wallet_update</code>, push notification</li>
+</ol>
+<p><strong>Idempotency:</strong> <code>idempotencyKey</code> unique constraint on Transaction prevents double-credit on duplicate webhooks.</p>
+<h3 id="4-3-auto-reload-threshold-based">4.3 Auto-Reload (Threshold-Based) </h3>
+<pre><code class="lang-prisma">model PaymentMethod {
+  id, userId
+  type          // credit_card | gcash | maya | apple_pay | google_pay
+  provider      // xendit | gcash_direct | apple | google (which gateway handles this method)
+  providerTokenId // tokenized card/account (never store raw card numbers)
+  maskedNumber, expiryMonth, expiryYear
+  isDefault, isAutoReload
+  autoThreshold // trigger below this balance
+  autoAmount    // reload this much
+}</code></pre>
+<p>After any wallet deduction: if <code>balance &lt; autoThreshold</code> and <code>isAutoReload</code>, call <code>PaymentGateway.chargeToken()</code> async. Failure → push notification + disable auto-reload.</p>
+<h3 id="4-4-supported-payment-methods-full-philippine-landscape">4.4 Supported Payment Methods — Full Philippine Landscape </h3>
+<h4 id="tier-1-launch-via-xenditadapter">Tier 1 — Launch (via XenditAdapter) </h4>
+<table><thead><tr><th>Method</th><th>Type</th><th>Fee (est.)</th><th>Notes</th></tr></thead><tbody><tr><td>**GCash**</td><td>E-wallet</td><td>2.3%</td><td>Largest PH e-wallet (~60M users). Primary top-up method.</td></tr><tr><td>**Maya (PayMaya)**</td><td>E-wallet</td><td>1.8%</td><td>Second-largest. Strong Visa/MC integration.</td></tr><tr><td>**GrabPay**</td><td>E-wallet</td><td>2.0%</td><td>Popular with ride-hailing users — natural Jeepi audience.</td></tr><tr><td>**Visa / Mastercard**</td><td>Credit & Debit</td><td>3.0% + $0.30</td><td>One-off top-ups via Xendit Invoice API (hosted checkout, PCI handled by Xendit). Tokenized for auto-reload.</td></tr><tr><td>**Amex / JCB**</td><td>Credit card</td><td>~3.5%</td><td>Lower volume. Tourists / expats.</td></tr><tr><td>**BancNet**</td><td>Domestic debit</td><td>~1.5-2.0%</td><td>Philippine ATM/debit network. Many Filipinos have BancNet-only cards (no Visa/MC logo). Critical for mass adoption.</td></tr><tr><td>**InstaPay**</td><td>Real-time bank transfer</td><td>₱0-15</td><td>BSP instant payment rail. 50+ banks (BDO, BPI, UnionBank, Metrobank, RCBC, LandBank).</td></tr><tr><td>**7-Eleven**</td><td>OTC cash</td><td>₱15 flat</td><td>Reference number in-app → pay cash at counter. For unbanked users.</td></tr><tr><td>**Cebuana Lhuillier**</td><td>OTC cash</td><td>₱25 flat</td><td>2,500+ branches. Deep rural reach.</td></tr><tr><td>**M Lhuillier**</td><td>OTC cash</td><td>₱20 flat</td><td>2,800+ branches. Different geographic coverage.</td></tr></tbody></table>
+<div class="callout callout-note">**Direct card for one-off payments:** Xendit's Invoice API handles this — the user enters card details on Xendit's hosted checkout page (never on Jeepi's UI). PCI DSS compliance is Xendit's responsibility. No separate card acquirer (BDO/BPI merchant account) needed. For one-off top-ups, no token is stored. For auto-reload, the user opts in and Xendit returns a reusable token.</div>
+<h4 id="tier-2-post-launch-new-adapters-lower-fees-or-broader-reach">Tier 2 — Post-Launch (new adapters, lower fees or broader reach) </h4>
+<table><thead><tr><th>Method</th><th>Adapter</th><th>Fee (est.)</th><th>Priority</th><th>Why</th></tr></thead><tbody><tr><td>**QR Ph (BSP standard)**</td><td>QRPhAdapter</td><td>₱0 (InstaPay)</td><td>**High**</td><td>BSP national QR code. Any PH banking app can scan. Zero fees. End-game for cheapest top-ups. See note below.</td></tr><tr><td>**Direct GCash API**</td><td>GCashDirectAdapter</td><td>~1.5%</td><td>High</td><td>Lower than Xendit's 2.3%. Worth it at >₱500K/mo GCash volume.</td></tr><tr><td>**Direct Maya API**</td><td>MayaDirectAdapter</td><td>~1.2-1.5%</td><td>Medium</td><td>Similar savings. Good developer experience.</td></tr><tr><td>**ShopeePay / SPayLater**</td><td>PayMongoAdapter</td><td>~2.0-3.0%</td><td>Medium</td><td>Only via PayMongo (not Xendit). SPayLater = buy-now-pay-later.</td></tr><tr><td>**Apple Pay**</td><td>ApplePayAdapter</td><td>~2.5%</td><td>Medium</td><td>Apple Pay JS SDK. Growing iOS urban adoption in PH.</td></tr><tr><td>**Google Pay**</td><td>GooglePayAdapter</td><td>~2.5%</td><td>Medium</td><td>Google Pay API. Broader Android reach.</td></tr><tr><td>**Coins.ph**</td><td>CoinsPhAdapter</td><td>~1.5-2.0%</td><td>Low</td><td>Popular for remittances/crypto. Niche audience.</td></tr><tr><td>**DragonPay**</td><td>DragonPayAdapter</td><td>Varies</td><td>Low</td><td>Bayad Center, SM Bills, Robinson's. Rural bank channels not on Xendit.</td></tr></tbody></table>
+<h4 id="qr-ph-the-long-term-play">QR Ph — The Long-Term Play </h4>
+<p>BSP is actively pushing the entire Philippines toward QR Ph as the universal payment standard. As of 2025-2026, digital banks and e-wallets are being forced OFF proprietary integrations onto standardized InstaPay/PESONet rails (BPI deactivated linked e-wallet accounts, GoTyme disabled linked deposits in Feb 2026).</p>
+<p><strong>What this means for Jeepi:</strong> A passenger with <em>any</em> Philippine banking app (BDO, BPI, UnionBank, GCash, Maya, GoTyme, Tonik, etc.) can top up their Jeepi wallet by scanning a QR Ph code — zero payment fees via InstaPay. Requires Jeepi to register as a QR Ph-accepting merchant with a BSP-approved PSP. <strong>Start this registration in Phase 3 (compliance) alongside the EMI application.</strong></p>
+<h4 id="adapter-roadmap">Adapter Roadmap </h4>
+<table><thead><tr><th>Phase</th><th>Adapters</th><th>Methods Unlocked</th></tr></thead><tbody><tr><td>**Phase 4 (launch)**</td><td>XenditAdapter</td><td>GCash, Maya, GrabPay, Cards, BancNet, InstaPay, OTC</td></tr><tr><td>**Phase 4 + 1-2 months**</td><td>QRPhAdapter</td><td>Any PH banking app via QR Ph (zero fees)</td></tr><tr><td>**Post-launch (scale)**</td><td>GCashDirectAdapter, MayaDirectAdapter</td><td>Lower-fee direct e-wallet integration</td></tr><tr><td>**Post-launch (reach)**</td><td>PayMongoAdapter</td><td>ShopeePay, SPayLater, redundancy</td></tr><tr><td>**Post-launch (premium)**</td><td>ApplePayAdapter, GooglePayAdapter</td><td>NFC tap-to-pay</td></tr><tr><td>**Post-launch (rural)**</td><td>DragonPayAdapter</td><td>Bayad Center, SM Bills, rural banks</td></tr></tbody></table>
+<h3 id="4-5-amla-compliance">4.5 AMLA Compliance </h3>
+<pre><code class="lang-prisma">model AmlaFlag {
+  id, userId, flagType, amount?, description
+  status  // open, reviewed, cleared, reported
+  reviewedBy, createdAt
+}</code></pre>
+<p>Auto-flag triggers: single transaction &gt;₱500K, cumulative 24h reloads &gt;₱50K, &gt;20 transactions/hour, structuring patterns. Unresolved flags after 72h → account suspension. Covered transaction reporting (&gt;₱500K) to AMLC within 5 working days via Cloud Scheduler nightly check.</p>
+<hr>
+<h2 id="phase-5-anti-spoofing-proximity-quorum-months-12-13">Phase 5: Anti-Spoofing — Proximity Quorum (Months 12–13) </h2>
+<h3 id="5-1-layered-confidence-score-not-binary-gate">5.1 Layered Confidence Score (not binary gate) </h3>
+<p>Multiple soft signals combine into a boarding confidence score. No single signal is a hard requirement — this accommodates diverse device capabilities across the Philippines.</p>
+<pre><code class="lang-text">Boarding confidence score (0–100):
+
+  QR scan within last 60s          → +50 pts  (physical proximity proof, already built)
+  GPS distance from driver &lt; 100m  → +30 pts
+  Speed/heading match ±20%         → +10 pts  (same vehicle motion pattern)
+  BLE jeepney beacon detected      → +10 pts  (hardware beacon, if installed on jeepney)
+
+Thresholds:
+  Score ≥ 70 → Board confirmed
+  Score 40–69 → Board accepted, flagged as low-confidence in AuditLog
+  Score &lt; 40 → Board rejected (likely not near the jeepney)</code></pre>
+<p><strong>Key insight:</strong> QR scan alone (already implemented) provides 50 points. QR + GPS = 80 points, sufficient for full confirmation. BLE and speed/heading are optional enhancements.</p>
+<p><strong>Rollout strategy:</strong></p>
+<ul>
+<li>Phase 5 launch: QR + GPS scoring (no hardware needed)</li>
+<li>Hardware rollout: BLE beacons provisioned to jeepneys as operators onboard</li>
+<li>Speed/heading matching: added once GPS pulse data is sufficiently reliable</li>
+</ul>
+<h3 id="5-2-spoofing-detection-rules">5.2 Spoofing Detection Rules </h3>
+<table><thead><tr><th>Rule</th><th>Threshold</th><th>Action</th></tr></thead><tbody><tr><td>Sudden location jump</td><td>>500m in 15s</td><td>Flag + hold payment</td></tr><tr><td>GPS/BLE mismatch</td><td>GPS says >200m but BLE says -50dBm</td><td>Flag</td></tr><tr><td>Impossible speed</td><td>>120 km/h</td><td>Flag + log</td></tr><tr><td>GPS accuracy too low</td><td>accuracy >500m</td><td>Ignore pulse</td></tr><tr><td>Multiple active sessions</td><td>Already enforced via `currentSessionToken`</td><td>Block</td></tr></tbody></table>
+<p>Extension to existing single-session logic: Block new logins for passengers with <code>heldAmount &gt; 0</code> (active paid trip).</p>
+<h3 id="5-3-proximity-group-redis">5.3 Proximity Group (Redis) </h3>
+<pre><code class="lang-text">Key: proximity:{tripId}
+TTL: 60s (auto-expires on missed pulses)
+Value: {
+  driverLat, driverLng, driverTimestamp,
+  passengers: {
+    {passengerId}: { lat, lng, timestamp, bleDetected, bleRssi, gpsDistance, inQuorum }
+  }
+}</code></pre>
+<h3 id="5-4-disputed-ride-flow">5.4 Disputed Ride Flow </h3>
+<ol>
+<li>Spoofing flag raised → payment held (existing <code>heldAmount</code> mechanism already in place on <code>Seat</code> model)</li>
+<li>Both parties notified via push: &quot;Payment under review&quot;</li>
+<li>Admin dispute queue shows GPS trail, BLE data, both accounts</li>
+<li>Admin resolves: pay driver / refund passenger / pro-rate</li>
+<li>Balance transferred per decision, AuditLog entry created</li>
+</ol>
+<h3 id="5-5-trip-history-watermark">5.5 Trip History Watermark </h3>
+<ul>
+<li>Passenger sees last 30 rides or 10 days (whichever fewer)</li>
+<li><code>GET /api/trips/history</code> returns <code>disputeStatus</code> per trip</li>
+<li>Disputed rides shown with distinct badge in UI</li>
+</ul>
+<hr>
+<h2 id="phase-6-revenue-model-founders-dashboard-months-14-15">Phase 6: Revenue Model & Founders Dashboard (Months 14–15) </h2>
+<h3 id="6-1-convenience-fees">6.1 Convenience Fees </h3>
+<ul>
+<li><strong>Passenger boarding:</strong> ₱1.00 deducted at <code>hop-in</code>, credited immediately to system wallet (<code>system@jeepi.ph</code>)</li>
+<li><strong>Driver settlement:</strong> ₱0.20 deducted at trip end from driver earnings</li>
+</ul>
+<pre><code class="lang-prisma">model ConvenienceFee {
+  id, tripId, seatId?
+  feeType   // passenger_boarding | driver_settlement
+  amount, currency, timestamp
+}</code></pre>
+<p>Fee amounts configurable in <code>globalSettings</code>: <code>passengerBoardingFee</code> and <code>driverSettlementFeeRate</code>. Changing them via <code>POST /api/settings</code> writes to Redis + DB + creates AuditLog entry.</p>
+<h3 id="6-1-1-mandatory-fare-discounts-philippine-law">6.1.1 Mandatory Fare Discounts (Philippine Law) </h3>
+<p>Three Philippine laws <strong>mandate</strong> a 20% fare discount on public transport. Non-compliance carries fines (₱1K–₱15K) and franchise revocation. Jeepi must enforce these automatically:</p>
+<table><thead><tr><th>Group</th><th>Law</th><th>Fare Discount</th><th>Convenience Fee</th><th>Verification</th></tr></thead><tbody><tr><td>**Students**</td><td>RA 11314 (Student Fare Discount Act)</td><td>20% off fare</td><td>50% off (₱0.60)</td><td>School ID photo match + selfie; valid during entire enrollment period incl. weekends/holidays</td></tr><tr><td>**Senior Citizens**</td><td>RA 9994 (Expanded Senior Citizens Act)</td><td>20% off fare + VAT exempt</td><td>50% off (₱0.60)</td><td>Gov't ID showing age 60+ (OSCA ID, driver's license, voter's ID, SSS/GSIS, passport); or birth certificate</td></tr><tr><td>**PWD**</td><td>RA 10754</td><td>20% off fare</td><td>50% off (₱0.60)</td><td>PWD ID issued by NCWDP or authorized LGU</td></tr></tbody></table>
+<p><strong>Implementation:</strong></p>
+<pre><code class="lang-prisma">model UserDiscount {
+  id             String   @id @default(uuid())
+  userId         String   @unique
+  discountType   String   // student | senior_citizen | pwd
+  verificationId String?  // uploaded ID photo reference (Cloud Storage)
+  selfieId       String?  // selfie for face match (students)
+  idExpiry       DateTime? // student IDs expire per semester
+  status         String   @default("pending") // pending | verified | rejected | expired
+  verifiedBy     String?  // admin who approved
+  verifiedAt     DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  user           User     @relation(fields: [userId], references: [id])
+}</code></pre>
+<p><strong>Fare calculation with discount (in <code>calculateFare()</code>):</strong></p>
+<pre><code class="lang-javascript">function calculateFare(baseAmount, userDiscountType) {
+  const DISCOUNT_RATE = 0.20; // 20% mandated by law
+  const discountedFare = ['student', 'senior_citizen', 'pwd'].includes(userDiscountType)
+    ? baseAmount * (1 - DISCOUNT_RATE)
+    : baseAmount;
+  return Math.round(discountedFare * 100) / 100; // round to centavo
+}
+
+function getConvenienceFee(userDiscountType, settings) {
+  const DISCOUNT_MULTIPLIER = 0.50; // 50% off convenience fee for eligible groups
+  const baseFee = settings.passengerBoardingFee; // ₱1.00 default
+  return ['student', 'senior_citizen', 'pwd'].includes(userDiscountType)
+    ? baseFee * DISCOUNT_MULTIPLIER
+    : baseFee;
+}</code></pre>
+<p><strong>Revenue impact (blended model):</strong></p>
+<p>Estimated rider composition for Philippine jeepney:</p>
+<table><thead><tr><th>Segment</th><th>% of Riders</th><th>Fare</th><th>Conv. Fee</th><th>Blended Rev/Ride</th></tr></thead><tbody><tr><td>Regular</td><td>~65%</td><td>₱25.00</td><td>₱1.20</td><td>₱0.780</td></tr><tr><td>Student</td><td>~25%</td><td>₱20.00 (−20%)</td><td>₱0.60 (−50%)</td><td>₱0.150</td></tr><tr><td>Senior</td><td>~7%</td><td>₱20.00 (−20%)</td><td>₱0.60 (−50%)</td><td>₱0.042</td></tr><tr><td>PWD</td><td>~3%</td><td>₱20.00 (−20%)</td><td>₱0.60 (−50%)</td><td>₱0.018</td></tr><tr><td>**Blended**</td><td>**100%**</td><td>**₱23.25**</td><td>**₱0.99**</td><td>**₱0.990**</td></tr></tbody></table>
+<p>This reduces the effective per-ride revenue from ₱1.20 to <strong>~₱0.99</strong> (17.5% reduction). The projection chart uses this blended rate.</p>
+<p><strong>Verification flow (Phase 3 KYC extension):</strong></p>
+<ol>
+<li>User selects discount type during registration or in settings</li>
+<li>Uploads required ID photo (school ID / OSCA / PWD card)</li>
+<li>For students: selfie is matched against school ID photo (basic face match)</li>
+<li>For seniors: DOB extracted from ID and validated (age ≥ 60)</li>
+<li>Admin reviews and approves/rejects via admin dashboard</li>
+<li>Approved users get <code>discountType</code> flag on their account</li>
+<li>Student discounts auto-expire at end of semester — user must re-verify</li>
+</ol>
+<h3 id="6-2-founders-dashboard-new-admin-role-page">6.2 Founders Dashboard (New Admin Role + Page) </h3>
+<ul>
+<li>Role: <code>founder</code> (separate from <code>admin</code>) — access to <code>admin-founders.html</code></li>
+<li><strong>Fee control panel:</strong> sliders for passenger fee (₱0–₱5, step ₱0.50) and driver rate (0–2%, step 0.1%)</li>
+<li><strong>Revenue reports:</strong> daily/weekly/monthly — fees collected, rides, active users/drivers. Export CSV.</li>
+<li><strong>Operational costs:</strong> Manual input form for GCP + Xendit costs → Net Revenue = Fees - Costs</li>
+<li><strong>Platform metrics:</strong> active routes, trips/day, new signups, wallet reload volume</li>
+<li>All reporting queries run against PostgreSQL read replica — never the primary</li>
+</ul>
+<h3 id="6-3-daily-reconciliation-cash-flow-integrity">6.3 Daily Reconciliation & Cash Flow Integrity </h3>
+<p><strong>Problem:</strong> Without reconciliation, unaccounted transactions (double-credits, failed webhooks, race conditions) go undetected until a user complains or an auditor finds the gap.</p>
+<p><strong>Three reconciliation layers:</strong></p>
+<table><thead><tr><th>Layer</th><th>What it reconciles</th><th>Frequency</th><th>Phase</th></tr></thead><tbody><tr><td>**Internal balance audit**</td><td>Sum of all user wallets = total system liability</td><td>Nightly</td><td>Phase 1 (job), Phase 6 (dashboard)</td></tr><tr><td>**Transaction integrity**</td><td>Every wallet change has a matching Transaction record</td><td>Nightly</td><td>Phase 1 (job), Phase 6 (dashboard)</td></tr><tr><td>**External (Xendit)**</td><td>Our reload records match Xendit's settlement report</td><td>Daily (after Xendit CSV)</td><td>Phase 4 (import), Phase 6 (dashboard)</td></tr></tbody></table>
+<h4 id="6-3-1-internal-balance-audit-cloud-scheduler-nightly">6.3.1 Internal Balance Audit (Cloud Scheduler — Nightly) </h4>
+<p>Nightly job runs at 23:59 PHT:</p>
+<pre><code class="lang-text">1. SUM(walletBalance) across all users         → "total_user_liability"
+2. SUM(walletBalance) across all drivers        → "total_driver_liability"
+3. System wallet balance (system@jeepi.ph)      → "platform_revenue"
+4. SUM(heldAmount) across all active seats      → "total_held"
+5. Cross-check: total_user_liability + total_driver_liability + platform_revenue
+                = SUM(all reload credits) - SUM(all fare debits) - SUM(all fees)</code></pre>
+<p>Any mismatch → <code>ReconciliationBreak</code> record created with severity:</p>
+<ul>
+<li><strong>&lt; ₱1:</strong> <code>info</code> (rounding, float precision)</li>
+<li><strong>₱1–100:</strong> <code>warning</code> (investigate within 24h)</li>
+<li><strong>&gt; ₱100:</strong> <code>critical</code> (immediate alert to founders via push + email)</li>
+</ul>
+<pre><code class="lang-prisma">model ReconciliationReport {
+  id            String   @id @default(uuid())
+  date          DateTime
+  type          String   // balance_audit | transaction_integrity | xendit_match
+  status        String   // pass | warning | critical
+  totalUsers    Float
+  totalDrivers  Float
+  totalPlatform Float
+  totalHeld     Float
+  expectedTotal Float
+  actualTotal   Float
+  breakAmount   Float    @default(0)
+  details       Json?    // breakdown of mismatches
+  createdAt     DateTime @default(now())
+
+  @@index([date, type])
+}</code></pre>
+<h4 id="6-3-2-transaction-integrity-check">6.3.2 Transaction Integrity Check </h4>
+<p>For every user, verify:</p>
+<pre><code class="lang-text">current walletBalance
+  = initial balance (0 or seed)
+  + SUM(Transaction WHERE type='reload')
+  - SUM(Transaction WHERE type='fare')
+  - SUM(Transaction WHERE type='fee')
+  + SUM(Transaction WHERE type='refund')</code></pre>
+<p>Flag any user where computed balance ≠ stored <code>walletBalance</code>. This catches:</p>
+<ul>
+<li>Race conditions in concurrent wallet operations</li>
+<li>Failed partial transactions (deducted but no Transaction record)</li>
+<li>Manual admin adjustments without matching Transaction</li>
+</ul>
+<h4 id="6-3-3-xendit-external-reconciliation">6.3.3 Xendit External Reconciliation </h4>
+<p>Xendit provides:</p>
+<ul>
+<li><strong>Generate Report API</strong> — trigger CSV report generation for any date range, automated daily</li>
+<li><strong>Transaction View API</strong> — query individual transactions with fees, taxes, settlement status</li>
+<li><strong>Balance Report</strong> — detailed ledger of credits, debits, fees, and taxes</li>
+<li>Reports can be scheduled for automated SFTP/email delivery</li>
+</ul>
+<p><strong>Daily flow:</strong></p>
+<ol>
+<li>Cloud Scheduler at 06:00 PHT → call Xendit Generate Report API for previous day</li>
+<li>Parse CSV: match each <code>external_id</code> to our <code>Transaction.providerChargeId</code> (filtered by <code>provider = &#39;xendit&#39;</code>)</li>
+<li>Verify amounts match (±₱0.01 for rounding)</li>
+<li>Flag unmatched: Xendit has record we don&#39;t (missed webhook) or we have record Xendit doesn&#39;t (orphaned)</li>
+<li>Import Xendit fees per transaction → <code>PlatformCost</code> table for net revenue calculation</li>
+</ol>
+<pre><code class="lang-prisma">model PlatformCost {
+  id          String   @id @default(uuid())
+  date        DateTime
+  category    String   // xendit_fee | xendit_vat | gcp | domain | other
+  description String
+  amount      Float    // in PHP
+  currency    String   @default("PHP")
+  source      String   // xendit_report | manual | gcp_billing
+  metadata    Json?    // provider, providerChargeId, invoiceNumber, etc.
+  createdAt   DateTime @default(now())
+
+  @@index([date, category])
+}</code></pre>
+<h4 id="6-3-4-founders-dashboard-reconciliation-panel">6.3.4 Founders Dashboard — Reconciliation Panel </h4>
+<p>New section on <code>admin-founders.html</code>:</p>
+<ul>
+<li><strong>Daily status indicator:</strong> Green (pass) / Amber (warning) / Red (critical) for each reconciliation layer</li>
+<li><strong>Break drill-down:</strong> Click to see individual mismatched users/transactions with before/after values</li>
+<li><strong>Trend chart:</strong> 30-day reconciliation history — shows if breaks are increasing</li>
+<li><strong>Xendit fee tracker:</strong> Daily/weekly/monthly fees paid to Xendit, broken down by payment method</li>
+<li><strong>Net revenue view:</strong> Jeepi convenience fees collected − Xendit fees − GCP costs = Net Revenue</li>
+<li><strong>Export:</strong> CSV download of reconciliation reports for accountant/auditor</li>
+</ul>
+<h3 id="6-4-data-monetization">6.4 Data Monetization </h3>
+<ul>
+<li>Weekly Cloud Scheduler → export anonymized aggregate data to BigQuery</li>
+<li>Anonymization: remove personal IDs, round GPS to 3 decimal places (±111m), k-anonymity (min 10 passengers per route segment), 1-hour time buckets</li>
+<li>Products: origin-destination pairs, route utilization by time, fare trends, dwell time at stops</li>
+<li>Buyers: MMDA, LTFRB, urban planners, academic researchers</li>
+<li>Opt-out: <code>analyticsOptOut Boolean @default(false)</code> on User model (set in Privacy Policy acceptance flow)</li>
+</ul>
+<hr>
+<h2 id="phase-7-friends-workflow-notification-center-parallel-with-phase-3-4">Phase 7: Friends Workflow & Notification Center (Parallel with Phase 3–4) </h2>
+<h3 id="7-1-friends-workflow-full-lifecycle">7.1 Friends Workflow — Full Lifecycle </h3>
+<p><strong>Current state:</strong> Basic add/accept/reject/list. No notifications to the receiver. No block/unfriend. No QR-based friend add.</p>
+<p><strong>Target state:</strong> Full social platform friends workflow with multiple discovery methods and lifecycle management.</p>
+<h4 id="friend-discovery-methods">Friend Discovery Methods </h4>
+<ol>
+<li><strong>Search by phone/email</strong> (already exists via <code>POST /api/users/search</code>)</li>
+<li><strong>QR code</strong> — each user has a personal Jeepi QR containing their userId. Scan with camera → instant friend request. Reuses existing QR scanner infrastructure.</li>
+<li><strong>Share link</strong> — user generates a deep link <code>app.jeepi.ph/friend/{userId}</code> that opens the app and sends a friend request. Good for social media sharing.</li>
+<li><strong>Nearby on same trip</strong> — show non-friend passengers on the same active trip (opt-in via privacy setting). Tap to send request.</li>
+</ol>
+<h4 id="friend-lifecycle-states">Friend Lifecycle States </h4>
+<pre><code class="lang-text">[not connected] → send request → [pending]
+                                     ├── accept → [friends]
+                                     ├── reject → [not connected]
+                                     └── cancel (by sender) → [not connected]
+
+[friends] → unfriend → [not connected]
+[any state] → block → [blocked] (hides from search, prevents future requests)
+[blocked] → unblock → [not connected]</code></pre>
+<h4 id="schema-changes">Schema Changes </h4>
+<pre><code class="lang-prisma">model FriendRequest {
+  // existing fields...
+  status    String @default("pending") // pending, accepted, rejected, cancelled, blocked
+}</code></pre>
+<p>No new model needed — the existing <code>FriendRequest</code> model is sufficient. Add <code>cancelled</code> and <code>blocked</code> status values. A blocked relationship prevents re-sending requests (check on <code>POST /api/friends/request</code>).</p>
+<h4 id="new-api-endpoints">New API Endpoints </h4>
+<ul>
+<li><code>POST /api/friends/cancel</code> — sender cancels pending request</li>
+<li><code>POST /api/friends/unfriend</code> — remove accepted friendship (deletes the FriendRequest record)</li>
+<li><code>POST /api/friends/block</code> — block user (sets status to <code>blocked</code>, hides from search results)</li>
+<li><code>POST /api/friends/unblock</code> — unblock user (deletes the FriendRequest record)</li>
+<li><code>GET /api/friends/qr/{userId}</code> — returns friend request deep link for QR generation</li>
+<li><code>POST /api/friends/nearby</code> — list non-friend passengers on same active trip (respects privacy opt-in)</li>
+</ul>
+<h4 id="privacy-controls-in-settings">Privacy Controls (in Settings) </h4>
+<ul>
+<li><code>discoverableOnTrip Boolean @default(false)</code> on User — whether nearby passengers on same trip can see you as a potential friend</li>
+<li><code>showOnlineStatus Boolean @default(true)</code> — whether friends can see &quot;On Same Trip&quot; badge</li>
+</ul>
+<h3 id="7-2-notification-center-persistent-in-app-inbox">7.2 Notification Center — Persistent In-App Inbox </h3>
+<p><strong>Current state:</strong> Toasts only (ephemeral, disappear in 2.5–4s). No persistent record. User misses notifications if app is closed.</p>
+<p><strong>Target state:</strong> A notification inbox that persists action-required items, integrates with push notifications (Phase 2), and drives user engagement.</p>
+<h4 id="notification-model">Notification Model </h4>
+<pre><code class="lang-prisma">model Notification {
+  id          String    @id @default(uuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type        String    // see types below
+  title       String
+  body        String
+  actionUrl   String?   // deep link within app (e.g. "/friends", "/settings#kyc")
+  actionLabel String?   // button text (e.g. "Verify Now", "View Request")
+  metadata    Json?     // type-specific data (friendId, tripId, amount, etc.)
+  isRead      Boolean   @default(false)
+  isActioned  Boolean   @default(false) // true after user completes the action
+  createdAt   DateTime  @default(now())
+  expiresAt   DateTime? // auto-dismiss after this date (null = never)
+
+  @@index([userId, isRead, createdAt])
+}</code></pre>
+<h4 id="notification-types">Notification Types </h4>
+<table><thead><tr><th>Type</th><th>Trigger</th><th>Title</th><th>Action</th><th>Expires</th></tr></thead><tbody><tr><td>`friend_request`</td><td>Someone sends you a friend request</td><td>"Maria wants to be your friend"</td><td>"View Request" → friends page</td><td>30 days</td></tr><tr><td>`friend_accepted`</td><td>Your request was accepted</td><td>"Juan accepted your friend request"</td><td>"View Friends"</td><td>7 days</td></tr><tr><td>`kyc_required`</td><td>Wallet reload blocked by KYC tier</td><td>"Verify your ID to reload more than ₱500"</td><td>"Verify Now" → KYC upload screen</td><td>Never</td></tr><tr><td>`kyc_approved`</td><td>Admin approved your document</td><td>"Your ID has been verified!"</td><td>None</td><td>7 days</td></tr><tr><td>`kyc_rejected`</td><td>Admin rejected your document</td><td>"ID verification failed — please resubmit"</td><td>"Resubmit" → KYC upload</td><td>Never</td></tr><tr><td>`payment_receipt`</td><td>Fare deducted after ride</td><td>"₱15.00 charged for Cubao → Monumento"</td><td>"View Ride" → trip history</td><td>10 days</td></tr><tr><td>`wallet_low`</td><td>Balance drops below ₱50 after a ride</td><td>"Your balance is ₱35.00 — top up to keep riding"</td><td>"Top Up" → reload modal</td><td>3 days</td></tr><tr><td>`ride_disputed`</td><td>Admin flags your ride</td><td>"Your ride on Feb 22 is under review"</td><td>"View Details" → trip history</td><td>Never</td></tr><tr><td>`dispute_resolved`</td><td>Admin resolves dispute</td><td>"Dispute resolved — ₱15.00 refunded"</td><td>"View Balance"</td><td>7 days</td></tr><tr><td>`libre_received`</td><td>A friend sponsored your fare</td><td>"Juan is paying for your ride!"</td><td>None</td><td>1 day</td></tr><tr><td>`libre_request`</td><td>You are asked to confirm sponsorship</td><td>"Juan wants to pay for your fare"</td><td>"Accept" / "Decline"</td><td>Trip duration</td></tr><tr><td>`auto_reload_failed`</td><td>Auto-reload card declined</td><td>"Auto top-up failed — update payment method"</td><td>"Update" → payment methods</td><td>Never</td></tr><tr><td>`system`</td><td>Platform announcements, maintenance</td><td>Varies</td><td>Varies</td><td>Varies</td></tr></tbody></table>
+<h4 id="ui-notification-bell-inbox">UI — Notification Bell + Inbox </h4>
+<p><strong>Bell icon</strong> in the passenger app header (next to wallet balance):</p>
+<ul>
+<li>Badge shows unread count (red dot with number)</li>
+<li>Tap opens notification inbox as a slide-up modal or dedicated screen</li>
+<li>Real-time: badge count updates via Socket.io event <code>notification_count</code></li>
+</ul>
+<p><strong>Inbox screen:</strong></p>
+<ul>
+<li>List of notifications, newest first</li>
+<li>Unread items highlighted with accent background</li>
+<li>Each item shows: icon (by type), title, body, time ago, action button (if actionable)</li>
+<li>Swipe to dismiss / mark as read</li>
+<li>&quot;Mark all as read&quot; button</li>
+<li>Auto-remove expired notifications on load</li>
+</ul>
+<h4 id="api-endpoints">API Endpoints </h4>
+<ul>
+<li><code>GET /api/notifications?userId={id}&amp;unreadOnly=true</code> — list notifications (paginated, 20 per page)</li>
+<li><code>POST /api/notifications/read</code> — mark one or more as read <code>{ notificationIds: [] }</code></li>
+<li><code>POST /api/notifications/read-all</code> — mark all as read for user</li>
+<li><code>DELETE /api/notifications/{id}</code> — dismiss notification</li>
+<li><code>GET /api/notifications/count?userId={id}</code> — unread count (for badge)</li>
+</ul>
+<h4 id="server-side-notificationservice">Server-Side: NotificationService </h4>
+<p>A reusable <code>NotificationService</code> module called from any API endpoint:</p>
+<pre><code class="lang-javascript">NotificationService.send({
+  userId: 'abc',
+  type: 'friend_request',
+  title: 'Maria wants to be your friend',
+  body: 'Tap to view and accept the request',
+  actionUrl: '/friends',
+  actionLabel: 'View Request',
+  metadata: { friendRequestId: 'xyz', senderName: 'Maria' },
+  expiresAt: addDays(now, 30)
+});</code></pre>
+<p>This method:</p>
+<ol>
+<li>Creates <code>Notification</code> record in DB</li>
+<li>Emits <code>new_notification</code> Socket.io event to <code>user:{userId}</code> room (real-time badge update)</li>
+<li>Sends push notification via FCM if user has registered DeviceToken (Phase 2)</li>
+<li>Toasts still fire for immediate feedback when the user is in-app</li>
+</ol>
+<h4 id="integration-points-where-notificationservice-send-is-called">Integration Points — Where NotificationService.send() is Called </h4>
+<table><thead><tr><th>Location in server.js</th><th>Event</th><th>Notification Type</th></tr></thead><tbody><tr><td>`POST /api/friends/request`</td><td>Friend request created</td><td>`friend_request` to receiver</td></tr><tr><td>`POST /api/friends/accept`</td><td>Friend accepted</td><td>`friend_accepted` to sender</td></tr><tr><td>`POST /api/wallet/reload` (rejected by KYC)</td><td>Reload blocked</td><td>`kyc_required`</td></tr><tr><td>KYC admin approval handler</td><td>Document approved</td><td>`kyc_approved`</td></tr><tr><td>KYC admin rejection handler</td><td>Document rejected</td><td>`kyc_rejected`</td></tr><tr><td>`POST /api/seat/settle` / trip end</td><td>Fare charged</td><td>`payment_receipt`</td></tr><tr><td>After any wallet deduction</td><td>Balance < ₱50</td><td>`wallet_low`</td></tr><tr><td>Spoofing detection flag</td><td>Ride flagged</td><td>`ride_disputed`</td></tr><tr><td>Admin dispute resolution</td><td>Dispute resolved</td><td>`dispute_resolved`</td></tr><tr><td>Libre Ka-Jeepi sponsorship</td><td>Fare sponsored</td><td>`libre_received` / `libre_request`</td></tr><tr><td>Auto-reload failure</td><td>Card declined</td><td>`auto_reload_failed`</td></tr></tbody></table>
+<h4 id="dev-estimate-addition">Dev Estimate Addition </h4>
+<table><thead><tr><th>Task</th><th>AI-Assisted</th><th>Human-Only</th></tr></thead><tbody><tr><td>Notification model + NotificationService</td><td>2-3 days</td><td>1 week</td></tr><tr><td>Notification API endpoints (list, read, count, dismiss)</td><td>1-2 days</td><td>3-4 days</td></tr><tr><td>Bell icon + badge + inbox UI (passenger app)</td><td>3-4 days</td><td>1-2 weeks</td></tr><tr><td>Socket.io `new_notification` + `notification_count` events</td><td>1 day</td><td>2 days</td></tr><tr><td>Integrate NotificationService into all trigger points</td><td>2-3 days</td><td>1 week</td></tr><tr><td>Friends workflow expansion (cancel, unfriend, block, QR add, nearby)</td><td>3-4 days</td><td>1-2 weeks</td></tr><tr><td>Friends privacy controls (discoverableOnTrip, showOnlineStatus)</td><td>1 day</td><td>2-3 days</td></tr><tr><td>**Total**</td><td>**~2-3 weeks**</td><td>**~5-7 weeks**</td></tr></tbody></table>
+<hr>
+<h2 id="phase-8-dagdag-bayad-libre-ka-jeepi-seat-reservation-parallel-with-phase-4-5">Phase 8: Dagdag Bayad, Libre Ka-Jeepi & Seat Reservation (Parallel with Phase 4–5) </h2>
+<h3 id="8-1-dagdag-bayad-pay-additional-mode-1">8.1 Dagdag Bayad (Pay Additional — Mode 1) </h3>
+<p><strong>Use case:</strong> Passenger pays for extra seats for family/friends who must all alight at the same stop.</p>
+<p>The <code>count</code> parameter already exists in <code>POST /api/seat/hop-in</code>. What&#39;s needed:</p>
+<ul>
+<li><strong>Schema:</strong> Add <code>groupId String?</code> and <code>groupCount Int?</code> to <code>Seat</code> model. All seats in group share same UUID.</li>
+<li><strong>API:</strong> When <code>count &gt; 1</code>, generate <code>groupId</code>, attach to all seats. <code>para-request</code> for any seat in group flags all seats <code>isStopping = true</code>.</li>
+<li><strong>UI:</strong> &quot;Add Extra Seats&quot; button on boarding screen → prompt for count → confirmation showing held amount × count</li>
+<li><strong>Driver UI:</strong> Shows &quot;Santos + 2 more&quot; as single grouped unit on seat map</li>
+</ul>
+<h3 id="8-2-libre-ka-jeepi-treat-friends-mode-2">8.2 Libre Ka-Jeepi (Treat Friends — Mode 2) </h3>
+<p><strong>Use case:</strong> Passenger sponsors fare for selected Jeepi friends on the same trip. Sponsored friend can alight anywhere.</p>
+<pre><code class="lang-prisma">model SeatSponsorship {
+  id, sponsorSeatId, sponsoreeSeatId
+  sponsorUserId, sponsoreeUserId, tripId
+  status  // active, settled, cancelled
+  createdAt
+}</code></pre>
+<p><strong>Logic:</strong></p>
+<ol>
+<li>Verify both on same <code>tripId</code> (already in state via seats)</li>
+<li>Verify sponsor balance ≥ friend&#39;s max fare hold</li>
+<li>Deduct sponsor wallet, increment friend&#39;s <code>heldAmount</code> (source: sponsor)</li>
+<li>On friend&#39;s <code>para-request</code>: calculate actual fare by friend&#39;s stop, charge sponsor, refund excess to sponsor</li>
+</ol>
+<p><strong>UI:</strong> Mode 2 only shown if user has Jeepi friends on same trip. Select friends from list → confirm → API creates <code>SeatSponsorship</code> records.</p>
+<h3 id="8-3-seat-reservation-pre-book-from-stop-mode-3">8.3 Seat Reservation (Pre-Book from Stop — Mode 3) </h3>
+<p><strong>Use case:</strong> Passenger pre-books seats from the &quot;Scan QR&quot; page before any jeepney arrives. The system auto-matches them to an approaching jeepney, notifies them with the plate number, and reserves seats that can&#39;t be taken by walk-ins.</p>
+<pre><code class="lang-prisma">model Reservation {
+  id, userId, routeId, seatCount
+  boardingLat, boardingLng, boardingStopName, boardingStopIndex
+  status   // waiting → matched → converted | expired | cancelled
+  tripId?, jeepneyPlate?, matchedAt?
+  heldAmount, expiresAt, missedCount, cancelReason?
+}
+// Seat model extended with: reservationId String?</code></pre>
+<p><strong>Logic:</strong></p>
+<ol>
+<li>User taps &quot;Reserve Seat&quot; → GPS resolves nearby routes → user picks route + seat count</li>
+<li>Balance hold (max fare × seatCount) applied at reservation creation</li>
+<li>Background matcher (5s interval) finds approaching jeepneys (one stop away + available capacity)</li>
+<li><strong>FIFO first-fit queue:</strong> Multiple reservations at same stop processed in <code>createdAt</code> order, but reservations that don&#39;t fit available capacity are skipped (not blocked)</li>
+<li>On match: reserve seats on trip (counted against capacity), notify passenger with plate number</li>
+<li>Passenger scans QR → reserved seats convert to occupied → normal payment flow</li>
+<li>If jeepney passes stop without QR scan → free seats, re-queue (up to 3 misses, then expire)</li>
+<li>If passenger boards a different jeepney → immediately cancel reservation, free seats</li>
+</ol>
+<p><strong>New files:</strong> <code>routes/reservations.js</code>, <code>services/reservation-matcher.js</code>
+<strong>Modified:</strong> <code>prisma/schema.prisma</code>, <code>config/constants.js</code>, <code>routes/seats.js</code> (capacity enforcement), <code>services/state.js</code>, <code>pages/passenger.js</code>, <code>pages/driver.js</code>, <code>server.js</code></p>
+<hr>
+<h2 id="phase-9-ux-polishing-branding-parallel-with-phase-2-4">Phase 9: UX Polishing & Branding (Parallel with Phase 2–4) </h2>
+<p><strong>Goal:</strong> Transform the MVP prototype into a production-quality user experience that builds trust with Philippine commuters, drivers, and operators. A cashless payment app handling real money must <em>feel</em> professional — rough edges erode user confidence.</p>
+<p><strong>Why parallel:</strong> UX work doesn&#39;t depend on backend phases. A designer/frontend dev can work on branding and polish while infrastructure and compliance are built. Ship polished UI with the pilot launch (Month 6).</p>
+<h3 id="9-1-brand-identity-design-system">9.1 Brand Identity & Design System </h3>
+<ul>
+<li><strong>Jeepi logo</strong> — professional vector logo (SVG) with jeepney motif, works at 16px favicon and 512px splash screen</li>
+<li><strong>Color palette</strong> — primary, secondary, accent, semantic (success/warning/error) + dark mode variants. Currently using theme system (Phase 2 i18n) — refine palette for production</li>
+<li><strong>Typography</strong> — select Google Font that supports Filipino text, establish heading/body/caption scale</li>
+<li><strong>Design tokens</strong> — centralize all colors, spacing, radii, shadows in <code>css/design-tokens.css</code> (replace scattered inline styles)</li>
+<li><strong>Component library</strong> — document reusable UI patterns: buttons, cards, modals, form inputs, toasts, badges. Ensure consistent styling across passenger, driver, admin apps</li>
+<li><strong>App icon</strong> — Android adaptive icon + iOS icon (1024px) for store listings</li>
+</ul>
+<h3 id="9-2-onboarding-first-time-user-experience">9.2 Onboarding & First-Time User Experience </h3>
+<ul>
+<li><strong>Splash screen</strong> — branded loading screen for Capacitor app launch (replaces blank white screen)</li>
+<li><strong>Onboarding carousel</strong> — 3-4 slides explaining: what Jeepi is, how to ride, how wallet works, privacy commitment</li>
+<li><strong>Registration flow polish</strong> — progress indicator, inline validation, Filipino language option, clear KYC tier explanation (&quot;Verify your ID to unlock higher wallet limits&quot;)</li>
+<li><strong>Empty states</strong> — friendly illustrations for: no trips yet, no friends, wallet empty, no notifications</li>
+<li><strong>Contextual tooltips</strong> — first-time hints on key actions (scan QR, tap to pay, swipe to dismiss)</li>
+</ul>
+<h3 id="9-3-passenger-app-polish">9.3 Passenger App Polish </h3>
+<ul>
+<li><strong>Ride screen redesign</strong> — clearer boarding status, animated progress, fare estimate prominently displayed</li>
+<li><strong>Wallet screen</strong> — transaction history with icons by type (ride, reload, refund), running balance chart</li>
+<li><strong>Payment confirmation</strong> — satisfying animation on successful payment (not just a toast)</li>
+<li><strong>Error states</strong> — clear, actionable error messages in Filipino and English (not generic &quot;Something went wrong&quot;)</li>
+<li><strong>Accessibility</strong> — minimum touch target 44px, sufficient color contrast (WCAG AA), screen reader labels on all interactive elements</li>
+<li><strong>Loading states</strong> — skeleton screens instead of spinners for perceived performance</li>
+</ul>
+<h3 id="9-4-driver-app-polish">9.4 Driver App Polish </h3>
+<ul>
+<li><strong>Trip dashboard</strong> — at-a-glance view: passenger count, current earnings, route progress</li>
+<li><strong>Seat map</strong> — visual grid with clear occupied/empty/stopping states, grouped seats for Dagdag Bayad</li>
+<li><strong>Earnings summary</strong> — daily/weekly totals with trend, breakdown by trip</li>
+<li><strong>Notifications</strong> — prominent alerts for para requests, new boardings, payment events</li>
+</ul>
+<h3 id="9-5-app-store-presence">9.5 App Store Presence </h3>
+<ul>
+<li><strong>Store listing copy</strong> — compelling description in English and Filipino, feature highlights, safety/privacy messaging</li>
+<li><strong>Screenshots</strong> — 5-8 polished screenshots per app (passenger + driver) showing key flows</li>
+<li><strong>App preview video</strong> — 15-30s demo of the boarding-to-payment flow</li>
+<li><strong>Privacy policy URL</strong> — required for both App Store and Play Store (links to Phase 3 privacy policy)</li>
+<li><strong>App Store category:</strong> Finance &gt; Payment (triggers financial app review — plan for 2-4 week review cycle)</li>
+</ul>
+<h3 id="9-6-dev-estimate">9.6 Dev Estimate </h3>
+<table><thead><tr><th>Task</th><th>AI-Assisted</th><th>Human-Only</th></tr></thead><tbody><tr><td>Brand identity (logo, palette, typography, design tokens)</td><td>2-3 days</td><td>1-2 weeks</td></tr><tr><td>Component library documentation + consistency pass</td><td>2-3 days</td><td>1 week</td></tr><tr><td>Onboarding carousel + splash screen</td><td>1-2 days</td><td>3-4 days</td></tr><tr><td>Registration flow polish + empty states</td><td>2-3 days</td><td>1 week</td></tr><tr><td>Passenger app UX polish (ride screen, wallet, animations)</td><td>3-4 days</td><td>2-3 weeks</td></tr><tr><td>Driver app UX polish (dashboard, seat map, earnings)</td><td>2-3 days</td><td>1-2 weeks</td></tr><tr><td>Accessibility pass (touch targets, contrast, screen reader)</td><td>1-2 days</td><td>3-4 days</td></tr><tr><td>App Store assets (screenshots, listing copy, preview video)</td><td>2-3 days</td><td>1 week</td></tr><tr><td>**Total**</td><td>**~2-3 weeks**</td><td>**~6-10 weeks**</td></tr></tbody></table>
+<hr>
+<h2 id="cross-cutting-concerns-woven-across-phases">Cross-Cutting Concerns (Woven Across Phases) </h2>
+<p>These concerns don&#39;t belong to a single phase — they span the full rollout and must be addressed incrementally. Each item is tagged with the phase(s) where it first becomes relevant.</p>
+<h3 id="c-1-offline-resilience-phase-2">C.1 Offline Resilience (Phase 2+) </h3>
+<p><strong>Problem:</strong> Philippine jeepney routes pass through areas with intermittent cellular signal. A passenger who loses connectivity mid-trip risks a stuck payment, ghost seat, or failed alighting request.</p>
+<p><strong>Design: Queue-and-Retry with Idempotency</strong></p>
+<p>All client-to-server API calls go through a <code>RequestQueue</code> in the Capacitor app:</p>
+<pre><code class="lang-text">1. App detects offline (@capacitor/network listener)
+2. Any API call → serialized to local queue (IndexedDB/SQLite)
+3. Each queued request includes an idempotency key (UUID generated client-side)
+4. When connectivity resumes → replay queue in order
+5. Server checks idempotency key → if already processed, return cached response (no double-charge)</code></pre>
+<p><strong>Edge cases:</strong></p>
+<ul>
+<li><strong>Fare hold captured at boarding</strong> — already deducted server-side before the trip starts. Offline mid-trip doesn&#39;t affect the hold.</li>
+<li><strong>Para request (alighting) while offline</strong> — queued locally. If connectivity doesn&#39;t recover within the trip, the driver sees the passenger as &quot;still riding.&quot; Auto-resolve: if a passenger&#39;s last GPS pulse is &gt;500m from any remaining stop and &gt;2 hours stale, the system auto-settles at the nearest stop to their last known position.</li>
+<li><strong>Driver sees correct seat count</strong> — the driver&#39;s connection is independent. If <em>only</em> the passenger is offline, the driver&#39;s seat map is unaffected. If the driver is also offline, the trip continues locally on the driver&#39;s app with a &quot;reconnecting&quot; indicator.</li>
+<li><strong>TTL on pending trips</strong> — if a trip remains in <code>pending</code> state for &gt;2 hours after the trip ends, Cloud Scheduler auto-resolves: calculate fare based on last known GPS, settle payment, notify both parties via push (when they come back online).</li>
+<li><strong>Idempotency key storage</strong> — server stores <code>{ idempotencyKey, response, createdAt }</code> in Redis with 24h TTL. Replayed requests return the original response.</li>
+</ul>
+<p><strong>Phases:</strong> Core offline queue built in Phase 2 (Capacitor). Idempotency middleware added in Phase 1 (Foundation). Auto-resolve job in Phase 5 (Anti-Spoofing) alongside the disputed ride flow.</p>
+<h3 id="c-2-disaster-recovery-backups-phase-1">C.2 Disaster Recovery & Backups (Phase 1+) </h3>
+<p><strong>Cost-Optimized Tier Strategy:</strong> Start cheap, scale up as user base and revenue grow.</p>
+<table><thead><tr><th>Tier</th><th>What</th><th>Cost</th><th>RTO</th><th>RPO</th><th>When</th></tr></thead><tbody><tr><td>**Included**</td><td>Cloud SQL automated daily backups + point-in-time recovery (7 days)</td><td>$0 extra</td><td>10-30 min</td><td>5 min</td><td>Phase 1 (default)</td></tr><tr><td>**Redis persistence**</td><td>Enable AOF persistence + daily RDB snapshot to Cloud Storage</td><td>~$2/mo</td><td>5 min</td><td>1 min</td><td>Phase 1</td></tr><tr><td>**Code**</td><td>GitHub repo + Cloud Build auto-deploy from main branch</td><td>$0</td><td>Minutes</td><td>0</td><td>Already done</td></tr><tr><td>**Cross-region replica**</td><td>Cloud SQL read replica in `asia-southeast2` (Jakarta), promoted on failure</td><td>~$30/mo</td><td>5-10 min</td><td>~0</td><td>At ~1,000 DAU</td></tr><tr><td>**Multi-region DR**</td><td>Multi-region Cloud Run + Cloud SQL failover + Traffic Manager</td><td>~$200+/mo</td><td>Seconds</td><td>0</td><td>At significant revenue</td></tr></tbody></table>
+<p><strong>Pilot launch (Month 6):</strong> Included tier + Redis persistence = <strong>~$2/mo extra</strong>. Can restore from zero within 1 hour. Losing wallet balances is an extinction event — this covers it.</p>
+<p><strong>Scale triggers:</strong></p>
+<ul>
+<li><strong>1,000 DAU</strong> → Add cross-region Cloud SQL replica ($30/mo)</li>
+<li><strong>Revenue &gt; $1,000/mo</strong> → Full multi-region failover ($200+/mo)</li>
+<li><strong>Regulatory audit</strong> → Enable Cloud SQL audit logging + export to Cloud Storage</li>
+</ul>
+<p><strong>Backup verification:</strong> Monthly restore drill (Cloud Scheduler creates a test restore from latest backup, verifies row counts, then deletes). Takes &lt;5 min, costs pennies.</p>
+<h3 id="c-3-api-versioning-minimum-app-version-phase-1">C.3 API Versioning & Minimum App Version (Phase 1+) </h3>
+<p><strong>Two separate concerns that work together:</strong></p>
+<p><strong>API Versioning (backward compatibility):</strong></p>
+<ul>
+<li>URL-based: <code>/api/v1/seat/hop-in</code>, <code>/api/v2/seat/hop-in</code></li>
+<li>When a breaking change is needed, create <code>v2</code> endpoint. Keep <code>v1</code> alive until analytics show &lt;5% of active users still on old app version.</li>
+<li>Version header <code>X-API-Version</code> returned in all responses for client-side routing.</li>
+<li>Deprecation: <code>v1</code> endpoints return <code>Sunset: &lt;date&gt;</code> header 30 days before removal.</li>
+</ul>
+<p><strong>Minimum App Version (security + forced updates):</strong></p>
+<ul>
+<li>On every app launch: <code>GET /api/config</code> returns <code>{ minVersion: &quot;2.1.0&quot;, latestVersion: &quot;2.3.0&quot;, forceUpdate: false }</code>.</li>
+<li>If <code>appVersion &lt; minVersion</code> → blocking &quot;Please update&quot; screen. No API calls allowed.</li>
+<li>If <code>forceUpdate: true</code> → immediate block regardless of version (emergency patch).</li>
+<li><code>minVersion</code> is stored in <code>globalSettings</code> (Redis + DB), changeable by founders via admin dashboard.</li>
+<li>Capacitor: links to Play Store / App Store. Sideloaded APKs: links to <code>app.jeepi.ph/download</code>.</li>
+</ul>
+<p><strong>Why both:</strong> API versioning handles gradual rollout of breaking changes. Minimum version handles security vulnerabilities (a user on v1.0 with a known exploit must be forced to update even if <code>/api/v1/</code> still works).</p>
+<h3 id="c-4-rate-limiting-bot-prevention-phase-0">C.4 Rate Limiting & Bot Prevention (Phase 0+) </h3>
+<p><strong>Layered protection, cost-optimized:</strong></p>
+<table><thead><tr><th>Layer</th><th>Tool</th><th>Cost</th><th>What it stops</th></tr></thead><tbody><tr><td>**L3/L4 DDoS**</td><td>Cloud Armor (GCP)</td><td>Included with Cloud Run</td><td>Volumetric floods, SYN floods</td></tr><tr><td>**L7 API rate limiting**</td><td>`express-rate-limit` middleware</td><td>$0 (npm package)</td><td>Brute force, API abuse</td></tr><tr><td>**Bot prevention**</td><td>Cloudflare Turnstile (invisible challenge)</td><td>Free tier</td><td>Registration bots, automated signups</td></tr><tr><td>**Device fingerprinting**</td><td>Client-side device ID at registration</td><td>$0</td><td>Multi-account fraud (1 phone = 1 account)</td></tr></tbody></table>
+<p><strong>API rate limits (per endpoint category):</strong></p>
+<table><thead><tr><th>Endpoint</th><th>Limit</th><th>Window</th><th>Reason</th></tr></thead><tbody><tr><td>`POST /api/auth/register`</td><td>3 attempts</td><td>per IP / hour</td><td>Bot registration</td></tr><tr><td>`POST /api/auth/login`</td><td>5 attempts</td><td>per user / 15 min</td><td>Brute force</td></tr><tr><td>`POST /api/seat/hop-in`</td><td>1 per user</td><td>30 seconds</td><td>Hop-on spam</td></tr><tr><td>`POST /api/wallet/reload`</td><td>5 per user</td><td>per day</td><td>Fraud prevention</td></tr><tr><td>`GET /api/state`</td><td>10 per user</td><td>per minute</td><td>Polling abuse</td></tr><tr><td>`POST /api/friends/request`</td><td>20 per user</td><td>per day</td><td>Spam friend requests</td></tr><tr><td>All other endpoints</td><td>60 per user</td><td>per minute</td><td>General abuse</td></tr></tbody></table>
+<p><strong>Cloudflare Turnstile integration:</strong></p>
+<ul>
+<li>Invisible challenge on registration and login forms (no user friction).</li>
+<li>Works in Capacitor WebView (unlike some CAPTCHA providers).</li>
+<li>Server-side verification: <code>POST https://challenges.cloudflare.com/turnstile/v0/siteverify</code> with secret key.</li>
+<li>Free tier: unlimited verifications.</li>
+</ul>
+<p><strong>Device fingerprinting:</strong></p>
+<ul>
+<li>On registration, generate a device UUID via <code>@capacitor/device</code> and submit with the registration payload.</li>
+<li>Store in <code>User.deviceId</code>. Flag accounts sharing the same <code>deviceId</code> — potential multi-account fraud.</li>
+<li>Not a hard block (people share phones), but a signal for the AMLA flagging system.</li>
+</ul>
+<h3 id="c-5-ticket-system-dispute-resolution-phase-5">C.5 Ticket System & Dispute Resolution (Phase 5+) </h3>
+<p><strong>Three ticket sources, unified resolution queue:</strong></p>
+<table><thead><tr><th>Ticket Type</th><th>Source</th><th>Priority</th><th>Phase</th></tr></thead><tbody><tr><td>**Spoofing flag**</td><td>Automated by anti-spoofing engine</td><td>High</td><td>Phase 5</td></tr><tr><td>**User-initiated report**</td><td>"Report Issue" button on trip history</td><td>Medium</td><td>Phase 5</td></tr><tr><td>**Support form submission**</td><td>Help form in user menu panel</td><td>Normal</td><td>Phase 2 (pilot)</td></tr></tbody></table>
+<pre><code class="lang-prisma">model SupportTicket {
+  id            String    @id @default(uuid())
+  type          String    // spoofing_flag | user_report | support_form
+  status        String    @default("open") // open, in_progress, resolved, escalated
+  priority      String    @default("normal") // low, normal, high, critical
+  userId        String?   // reporter (null for system-generated)
+  tripId        String?   // related trip (null for general queries)
+  subject       String
+  description   String
+  category      String?   // fare_dispute, payment_issue, account, general, spoofing
+  resolution    String?   // refund, no_action, warning, suspension, pro_rate
+  resolvedBy    String?   // admin userId
+  resolvedAt    DateTime?
+  metadata      Json?     // spoofing scores, GPS trails, screenshots
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([status, priority, createdAt])
+  @@index([userId, createdAt])
+}</code></pre>
+<p><strong>User-initiated reports (from trip history):</strong></p>
+<ul>
+<li>Passenger trip history shows last 30 rides. Each ride has a &quot;Report Issue&quot; action.</li>
+<li>Pre-populated with <code>tripId</code>, route, fare, driver name. User adds description and optional category.</li>
+<li>Creates <code>SupportTicket</code> with <code>type: &#39;user_report&#39;</code> and links to the trip&#39;s GPS trail and payment records.</li>
+</ul>
+<p><strong>Support form (general queries):</strong></p>
+<ul>
+<li>Accessible from user menu panel → &quot;Help &amp; Support&quot;.</li>
+<li>Category selection (fare, payment, account, general), subject, description.</li>
+<li>On submit → creates ticket + sends auto-acknowledgment via Notification (in-app) + email.</li>
+<li>Auto-response includes ticket reference number and estimated response time.</li>
+</ul>
+<p><strong>Admin resolution queue (extends existing dispute queue from Phase 5):</strong></p>
+<ul>
+<li>Unified dashboard for all 3 ticket types, sorted by priority + age.</li>
+<li>Each ticket shows: user profile, trip details (if linked), GPS trail, payment history, spoofing scores.</li>
+<li>Actions: Refund passenger / Pay driver / Pro-rate / No action / Issue warning / Suspend account.</li>
+<li>Resolution creates AuditLog entry + sends Notification to user with outcome.</li>
+</ul>
+<h3 id="c-6-customer-support-faq-phase-2">C.6 Customer Support & FAQ (Phase 2+) </h3>
+<p><strong>Pilot phase (Month 6):</strong> Simple, low-cost support infrastructure:</p>
+<ul>
+<li><strong>FAQ pages</strong> — static HTML pages hosted on <code>app.jeepi.ph/help</code>:<ul>
+<li><code>help/passenger</code> — How to ride, wallet, payments, troubleshooting</li>
+<li><code>help/driver</code> — Starting trips, seat management, earnings, troubleshooting</li>
+<li>Bilingual (English + Filipino), mobile-optimized</li>
+<li>Linked from user menu panel in both passenger and driver apps</li>
+</ul>
+</li>
+<li><strong>Support form</strong> — (see C.5 above) — ticket-based, with auto-acknowledgment</li>
+<li><strong>Email</strong> — <code>support@jeepi.ph</code> forwards to ticketing system</li>
+</ul>
+<p><strong>Post-launch (Phase 8+):</strong> AI chatbot integration for common queries (wallet balance, trip history, fare calculation). Human escalation for disputes and account issues. This is not needed for pilot — the FAQ + ticket system covers initial support needs.</p>
+<h3 id="c-7-driver-cash-out-via-paymentgateway-disbursements-phase-4">C.7 Driver Cash-Out via PaymentGateway Disbursements (Phase 4) </h3>
+<p><strong>Current state:</strong> Mock cash-out UI exists in the prototype. Production needs real money movement.</p>
+<p><strong>PaymentGateway.createDisbursement() integration:</strong></p>
+<ul>
+<li>Launch adapter (Xendit) supports: bank transfer (BDO, BPI, UnionBank, etc.), GCash, Maya</li>
+<li>Driver selects method + amount in driver app → <code>POST /api/driver/cashout</code></li>
+<li>API calls <code>PaymentGateway.createDisbursement()</code> → funds transferred to driver&#39;s registered account</li>
+<li>Webhook confirms success/failure → update driver wallet balance + create Transaction record (with <code>provider</code> field)</li>
+</ul>
+<p><strong>Float management (critical):</strong></p>
+<ul>
+<li>Jeepi must maintain a balance with the disbursement provider to fund driver payouts.</li>
+<li>If 50 drivers cash out simultaneously and the provider balance is low, payouts fail.</li>
+<li><strong>Minimum float policy:</strong> <code>globalSettings.minimumProviderFloat</code> (default ₱50,000 for pilot)</li>
+<li><strong>Alert threshold:</strong> When <code>PaymentGateway.getBalance().available</code> drops below 150% of average daily driver payouts → push alert to founders</li>
+<li><strong>Reconciliation:</strong> Daily provider balance check added to the nightly reconciliation job (§6.3)</li>
+<li><strong>Founders dashboard:</strong> Real-time provider balance display + float history chart</li>
+</ul>
+<p><strong>Cash-out limits (pilot):</strong></p>
+<ul>
+<li>Minimum: ₱100</li>
+<li>Maximum: ₱10,000/day (kycLevel 1), ₱50,000/day (kycLevel 2)</li>
+<li>Frequency: 2 cash-outs per day (prevents fee-harvesting)</li>
+<li>Processing time: GCash/Maya instant, bank transfer 1-3 business days</li>
+</ul>
+<h3 id="c-8-driver-operator-onboarding-program-phase-2">C.8 Driver & Operator Onboarding Program (Phase 2+) </h3>
+<p><strong>Human process — not a code deliverable, but critical for pilot success.</strong></p>
+<ul>
+<li><strong>Field team</strong> handles first-contact onboarding for drivers and operators during pilot.</li>
+<li><strong>In-app FAQ</strong> (see C.6) provides self-service guidance for common workflows.</li>
+<li><strong>First-ride walkthrough:</strong> On a driver&#39;s first trip, the app shows contextual tooltips for key actions (accept passenger, process payment, end trip). Built as part of Phase 9 UX polish.</li>
+<li><strong>System simplicity is the strategy:</strong> The boarding-to-payment flow should be intuitive enough that a 5-minute demo from the field team is sufficient. If it requires more training, the UX needs simplification — not more training materials.</li>
+</ul>
+<p><strong>Driver app welcome flow:</strong></p>
+<ol>
+<li>First login → brief walkthrough (3 slides: start trip, manage passengers, end trip &amp; earn)</li>
+<li>Simulated trip available in &quot;training mode&quot; (no real passengers, no real money) — lets drivers practice before going live</li>
+<li>FAQ link prominently displayed during first 5 trips</li>
+</ol>
+<h3 id="c-9-battery-optimization-phase-2">C.9 Battery Optimization (Phase 2) </h3>
+<p><strong>Driver phones:</strong></p>
+<ul>
+<li>Require constant power source (vehicle charger) as part of onboarding training.</li>
+<li>Screen wake lock active during trips (already planned in Phase 2).</li>
+<li>BLE Peripheral + GPS broadcasting are power-intensive — charger is non-negotiable.</li>
+</ul>
+<p><strong>Passenger phones:</strong></p>
+<ul>
+<li><strong>Adaptive GPS interval:</strong> Active trip = 15s. Idle (no active trip) = 60s. Background (app not in foreground) = off.</li>
+<li><strong>Adaptive BLE scan:</strong> Only scan for driver BLE beacon during active boarding (30s window after QR scan). Stop scanning once confirmed or timed out.</li>
+<li><strong>Battery-aware mode:</strong> If battery &lt;15%, show notification suggesting the passenger keep the app in foreground for reliable payment settlement. Reduce GPS pulse to 30s.</li>
+<li>Capacitor <code>@capacitor/battery</code> plugin for battery level monitoring.</li>
+</ul>
+<h3 id="c-10-terms-of-service-legal-framework-phase-3">C.10 Terms of Service & Legal Framework (Phase 3) </h3>
+<p><strong>Structure based on Philippine ride-hailing and fintech patterns (Grab PH, Angkas, GCash):</strong></p>
+<table><thead><tr><th>Section</th><th>Contents</th><th>Regulatory Basis</th></tr></thead><tbody><tr><td>**Service Description**</td><td>Cashless payment platform for jeepney fares, not a transport provider</td><td>Consumer Act (RA 7394)</td></tr><tr><td>**Eligibility**</td><td>18+ for wallet, parental consent for minors, valid Philippine ID for KYC1+</td><td>BSP Circular 1160</td></tr><tr><td>**Account & Wallet**</td><td>One account per person, wallet limits by KYC tier, no interest on stored value</td><td>BSP e-money regulations</td></tr><tr><td>**Payments & Refunds**</td><td>Fare calculation method, hold-and-settle model, refund policy (72h for disputes), convenience fees disclosed</td><td>E-Commerce Act (RA 8792)</td></tr><tr><td>**Privacy & Data**</td><td>Consent for GPS/BLE collection, data retention (5yr financial, 90d GPS), right to erasure, DPO contact</td><td>Data Privacy Act (RA 10173)</td></tr><tr><td>**Prohibited Conduct**</td><td>GPS spoofing, multi-accounting, wallet laundering, fare evasion</td><td>AMLA, BSP KYC rules</td></tr><tr><td>**Dispute Resolution**</td><td>In-app ticket system, 72h response SLA, escalation to DTI mediation if unresolved</td><td>Consumer Act</td></tr><tr><td>**Limitation of Liability**</td><td>Platform facilitates payment only, not responsible for transport quality/safety</td><td>Standard fintech ToS</td></tr><tr><td>**Termination**</td><td>Account suspension for ToS violations, wallet balance refund process on termination</td><td>Consumer Act</td></tr><tr><td>**Modifications**</td><td>30-day notice for material changes, continued use = acceptance</td><td>E-Commerce Act</td></tr></tbody></table>
+<p><strong>Implementation:</strong></p>
+<ul>
+<li>Privacy Policy + Terms of Service pages hosted at <code>app.jeepi.ph/legal/privacy</code> and <code>app.jeepi.ph/legal/terms</code></li>
+<li>Acceptance checkbox at registration (required). Re-acceptance prompt on material ToS changes.</li>
+<li>Version-tracked: <code>tosVersion</code> field on User model. If <code>user.tosVersion &lt; currentTosVersion</code>, prompt re-acceptance on next login.</li>
+</ul>
+<p><strong>Legal review required:</strong> This framework is a template. Must be reviewed by Philippine legal counsel before launch, particularly for BSP EMI compliance and NPC registration requirements.</p>
+<h3 id="c-11-product-analytics-event-instrumentation-phase-1">C.11 Product Analytics & Event Instrumentation (Phase 1+) </h3>
+<p><strong>Two purposes: platform health monitoring + future data monetization.</strong></p>
+<p><strong>Structured Event Schema (instrument from Day 1):</strong></p>
+<pre><code class="lang-prisma">model AnalyticsEvent {
+  id          String   @id @default(uuid())
+  userId      String?
+  driverId    String?
+  eventType   String   // see categories below
+  properties  Json     // event-specific data
+  deviceInfo  Json?    // platform, appVersion, os, battery
+  sessionId   String?
+  timestamp   DateTime @default(now())
+
+  @@index([eventType, timestamp])
+  @@index([userId, timestamp])
+}</code></pre>
+<p><strong>Platform Health Metrics (internal dashboard):</strong></p>
+<table><thead><tr><th>Category</th><th>Metrics</th><th>Purpose</th></tr></thead><tbody><tr><td>**Engagement**</td><td>DAU/MAU, session duration, trips/user/week</td><td>User retention</td></tr><tr><td>**Trip funnel**</td><td>QR scan → board → ride → alight → settle (conversion at each step)</td><td>UX bottleneck detection</td></tr><tr><td>**Payment**</td><td>Reload success rate, payment method split, average fare, auto-reload adoption</td><td>Revenue optimization</td></tr><tr><td>**Performance**</td><td>API latency P50/P95/P99, app crash rate, Socket.io reconnection rate</td><td>Platform stability</td></tr><tr><td>**Support**</td><td>Ticket volume by category, resolution time P50/P95, dispute rate per 1000 trips</td><td>Support quality</td></tr><tr><td>**Driver**</td><td>Utilization (% seats filled), trips/day, earnings/day, cash-out frequency</td><td>Driver satisfaction</td></tr></tbody></table>
+<p><strong>Data Monetization Pipeline (connects to §6.4):</strong></p>
+<ul>
+<li>Raw events stored in PostgreSQL (hot, 90 days) → nightly export to BigQuery (cold, indefinite).</li>
+<li>Anonymization layer (already defined in §6.4): strip PII, round GPS to 3 decimals, k-anonymity thresholds.</li>
+<li>Revenue products: origin-destination demand heatmaps, route utilization by time-of-day, fare elasticity curves, dwell time at stops, cross-route transfer patterns.</li>
+<li>Buyers: MMDA, LTFRB, urban planners, academic researchers, transit operators.</li>
+<li><strong>Key insight:</strong> instrument events <em>now</em> (near-zero cost during pilot). The data compounds in value — 6 months of ride data from a pilot is worth more to urban planners than any single feature.</li>
+</ul>
+<p><strong>Cost:</strong> BigQuery storage is ~$0.02/GB/month. Even at 10,000 events/day, this is &lt;$1/month for years of data.</p>
+<h3 id="c-12-app-store-tax-avoidance-wallet-top-up-strategy-phase-4">C.12 App Store Tax Avoidance — Wallet Top-Up Strategy (Phase 4) </h3>
+<p><strong>The 30% problem:</strong> Apple and Google take 30% (15% for small businesses) of all in-app purchases processed through their billing systems. For a ₱100 wallet top-up, ₱30 would go to Apple/Google — more than Xendit&#39;s 2.3% fee and Jeepi&#39;s ₱1 convenience fee <em>combined</em>. This would make the business model unviable.</p>
+<p><strong>The good news: Jeepi is likely exempt.</strong></p>
+<p>Apple&#39;s App Store Review Guidelines (§3.1.3(e)) and Google Play&#39;s Payment Policy both exempt apps that facilitate purchases of <strong>physical goods or real-world services</strong>. Jeepi wallet top-ups pay for jeepney transportation — a real-world service. GCash, Maya, Grab, and other Philippine payment/transport apps use external payment processing for wallet top-ups without Apple/Google IAP.</p>
+<p><strong>Precedent apps (Philippines):</strong></p>
+<ul>
+<li><strong>GCash</strong> — wallet top-ups via bank transfer, OTC, card — no IAP</li>
+<li><strong>Maya (PayMaya)</strong> — same approach, external payment processing</li>
+<li><strong>Grab</strong> — wallet credits loaded externally, used for rides</li>
+<li><strong>Angkas</strong> — payment via GCash/card, no IAP for ride credits</li>
+</ul>
+<p><strong>Implementation strategy (belt-and-suspenders):</strong></p>
+<ol>
+<li><p><strong>Primary: In-app Xendit checkout (no IAP)</strong></p>
+<ul>
+<li>User taps &quot;Top Up&quot; → selects amount → selects GCash/Maya/Card/Bank</li>
+<li>Opens Xendit checkout in Capacitor in-app browser (<code>@capacitor/browser</code>)</li>
+<li>Xendit processes payment → webhook → credit wallet</li>
+<li>This is <em>external</em> payment processing for a real-world service — exempt from IAP</li>
+<li>No UX compromise: the flow is identical to GCash/Grab</li>
+</ul>
+</li>
+<li><p><strong>Fallback: Web-based top-up portal</strong></p>
+<ul>
+<li><code>app.jeepi.ph/topup?userId={id}&amp;token={session}</code> — mobile-optimized web page</li>
+<li>Same Xendit checkout flow, but entirely in the browser</li>
+<li>Useful if Apple ever challenges the in-app approach (Netflix strategy)</li>
+<li>Also useful for: kiosk-based top-ups, top-up by family member, desktop reload</li>
+</ul>
+</li>
+<li><p><strong>OTC top-up (no app required)</strong></p>
+<ul>
+<li>7-Eleven and Cebuana over-the-counter payments via Xendit</li>
+<li>User gets a reference number in-app → pays cash at counter → Xendit webhook credits wallet</li>
+<li>Zero App Store involvement</li>
+</ul>
+</li>
+</ol>
+<p><strong>App Store review preparation:</strong></p>
+<ul>
+<li>In the App Store submission, clearly categorize Jeepi as a <strong>transportation payment platform</strong> (not a digital goods marketplace)</li>
+<li>Reference Apple&#39;s §3.1.3(e) exemption in the review notes</li>
+<li>Prepare a response template for reviewer questions: &quot;Wallet funds are used exclusively for real-world jeepney transportation fares in the Philippines&quot;</li>
+<li>Plan for 2-4 week review cycle (Finance &gt; Payment category triggers deeper review)</li>
+</ul>
+<p><strong>Risk assessment:</strong> Low. This exemption is well-established and used by every major Philippine fintech app. The fallback web portal provides insurance at near-zero additional cost.</p>
+<hr>
+<h3 id="c-13-cryptographic-security-post-quantum-readiness">C.13 Cryptographic Security & Post-Quantum Readiness </h3>
+<p><strong>Current cryptographic primitives:</strong></p>
+<table><thead><tr><th>Component</th><th>Algorithm</th><th>Where Used</th><th>Quantum Risk</th></tr></thead><tbody><tr><td>Password hashing</td><td>bcrypt (10 rounds)</td><td>`routes/auth.js`, `routes/driver-auth.js`</td><td>Low-medium — Grover's halves security (128→64 bit) but memory-hard property mitigates</td></tr><tr><td>Session tokens</td><td>UUID v4 (`crypto.randomUUID()`, 128-bit)</td><td>`routes/auth.js`</td><td>Low — tokens are short-lived and stateful (DB-stored)</td></tr><tr><td>TLS certificates</td><td>RSA-2048 + SHA-256</td><td>`generate-certs-forge.js` (dev only)</td><td>**Medium** — Shor's algorithm breaks RSA in polynomial time</td></tr><tr><td>TLS in transit</td><td>Depends on cipher suite negotiation</td><td>`server.js` HTTPS</td><td>Medium — captured traffic decryptable later ("harvest now, decrypt later")</td></tr></tbody></table>
+<p><strong>Assessment:</strong> No immediate action required. All primitives are standard and currently secure. The &quot;harvest now, decrypt later&quot; threat applies to TLS traffic but:</p>
+<ul>
+<li>Dev uses self-signed certs (not production-relevant)</li>
+<li>Production on GCP Cloud Run uses Google-managed TLS, which is deploying hybrid PQC (X25519Kyber768) across Google infrastructure</li>
+<li>Session tokens are stateful and short-lived — low quantum value</li>
+<li>bcrypt password hashes have minimal &quot;decrypt later&quot; value (offline brute-force, not decryption)</li>
+</ul>
+<p><strong>Phase 1 actions (production deployment):</strong></p>
+<ul>
+<li>GCP Cloud Run provides Google-managed TLS with modern cipher suites — no manual TLS config needed</li>
+<li>Consider upgrading session tokens from 128-bit UUID to 256-bit random values (<code>crypto.randomBytes(32).toString(&#39;hex&#39;)</code>) — trivial change, doubles quantum resistance</li>
+<li>Document crypto inventory for BSP compliance (EMI license requirement)</li>
+</ul>
+<p><strong>Phase 3+ actions (when PQC standards mature):</strong></p>
+<ul>
+<li>Monitor NIST PQC standard adoption in Node.js / OpenSSL (CRYSTALS-Kyber for key exchange, CRYSTALS-Dilithium for signatures)</li>
+<li>Google Cloud will handle TLS PQC migration for managed services (Cloud Run, Cloud SQL)</li>
+<li>Evaluate Argon2id migration from bcrypt (stronger memory-hard properties, better parameterization)</li>
+</ul>
+<p><strong>No-action items (not worth engineering time now):</strong></p>
+<ul>
+<li>JWT migration — we use stateful sessions, which are already easier to secure</li>
+<li>Application-level encryption — TLS + database encryption-at-rest (Cloud SQL default) is sufficient</li>
+<li>Custom PQC libraries — wait for standard library support</li>
+</ul>
+<hr>
+<h3 id="c-14-production-observability-log-access">C.14 Production Observability & Log Access </h3>
+<p><strong>Logging architecture:</strong></p>
+<pre><code class="lang-text">Jeepi (pino) → stdout JSON → Cloud Run → Cloud Logging (auto-captured)
+                                            ↓
+                                    Cloud Error Reporting (auto-grouped)
+                                            ↓
+                                    Alerting Policies → Email/PagerDuty</code></pre>
+<p><strong>Pino configuration (already implemented):</strong></p>
+<ul>
+<li>Development: <code>pino-pretty</code> for human-readable colored output</li>
+<li>Production: JSON with GCP-compatible <code>severity</code> field mapping (<code>INFO</code>, <code>WARNING</code>, <code>ERROR</code>, <code>CRITICAL</code>)</li>
+<li>Structured context: <code>{ tripId, userId, seatId, err }</code> attached to log entries for field-based querying</li>
+<li>Request logging via <code>pino-http</code> middleware (auto-logs method, URL, status, response time)</li>
+<li><code>/api/state</code> excluded from auto-logging (high-frequency polling endpoint)</li>
+<li>Password field redaction in <code>pinoHttp</code> request/response serializers</li>
+</ul>
+<p><strong>Request context enrichment (Sub-Phase 2B — implemented):</strong></p>
+<ul>
+<li><code>middleware/request-context.js</code> creates a pino child logger on every request with: <code>userId</code>, <code>tripId</code>, <code>driverId</code>, <code>platform</code> (from <code>X-Jeepi-Platform</code>), <code>appVersion</code> (from <code>X-Jeepi-Version</code>), <code>requestId</code> (from <code>X-Request-Id</code>)</li>
+<li>GCP Cloud Trace correlation: reads <code>X-Cloud-Trace-Context</code> header, writes <code>logging.googleapis.com/trace</code> field so all logs from the same request are grouped in Cloud Trace</li>
+<li>31+ lifecycle log lines across route handlers (auth, trips, seats, wallet, reservations, friends, admin) at state transitions (trip start/end, boarding, payment, settlement)</li>
+<li>Socket lifecycle logs: connect, disconnect, room join events</li>
+</ul>
+<p><strong>Cloud Logging query examples:</strong></p>
+<pre><code class="lang-bash"># Tail live logs
+gcloud alpha logging tail \
+  "resource.type=cloud_run_revision AND resource.labels.service_name=jeepi"
+
+# Errors only (last hour)
+gcloud logging read \
+  'resource.type="cloud_run_revision" AND resource.labels.service_name="jeepi" AND severity&gt;=ERROR' \
+  --freshness=1h --limit=100 --format=json
+
+# Search by trip or user
+gcloud logging read \
+  '...AND jsonPayload.tripId="abc123"'
+gcloud logging read \
+  '...AND jsonPayload.userId="user-uuid"'
+
+# Payment-related logs
+gcloud logging read \
+  '...AND jsonPayload.message=~"payment|fare|settle"'</code></pre>
+<p><strong>AI agent (Claude Code) access:</strong></p>
+<ul>
+<li><code>gcloud</code> CLI via Bash tool — Claude can query, filter, and analyze logs directly</li>
+<li>No additional setup beyond <code>gcloud auth login</code> in the shell environment</li>
+<li>Structured JSON fields (tripId, userId, err with stack trace) enable precise debugging</li>
+</ul>
+<p><strong>Recommended alert setup (Phase 1 deployment):</strong></p>
+<table><thead><tr><th>Alert</th><th>Trigger</th><th>Channel</th><th>Priority</th></tr></thead><tbody><tr><td>Cloud Error Reporting</td><td>New exception group detected</td><td>Email (founders)</td><td>Auto (free)</td></tr><tr><td>Error rate spike</td><td>>20 errors in 5 minutes</td><td>Email</td><td>Create in Cloud Monitoring</td></tr><tr><td>Service down</td><td>Request count = 0 for 5 min</td><td>Email + SMS</td><td>Cloud Monitoring uptime check</td></tr><tr><td>Payment failures</td><td>`severity>=ERROR AND message=~"payment|settle|fare"`</td><td>Email</td><td>Log-based metric + alert</td></tr></tbody></table>
+<p><strong>Cost:</strong> Free at Jeepi&#39;s scale. Cloud Logging free tier: 50 GiB/month ingestion, 30-day retention. A typical app at 10K requests/day generates ~2-5 GB/month.</p>
+<p><strong>Environment variables for production:</strong></p>
+<pre><code class="lang-env">NODE_ENV=production
+LOG_LEVEL=info        # Use 'warn' to reduce volume if needed</code></pre>
+<hr>
+<h3 id="c-15-test-simulation-feature-guards">C.15 Test & Simulation Feature Guards </h3>
+<p>Test and simulation features are guarded by <code>NODE_ENV</code> checks. In production (<code>NODE_ENV=production</code>), all test features are disabled.</p>
+<table><thead><tr><th>Feature</th><th>Guard</th><th>Production Behavior</th></tr></thead><tbody><tr><td>`seedAll()` (26 entities)</td><td>`NODE_ENV !== 'production'`</td><td>Not called — no seed data created</td></tr><tr><td>`POST /api/auth/guest` wallet balance</td><td>`NODE_ENV === 'production' ? 0 : 1000`</td><td>Guests get ₱0 balance</td></tr><tr><td>GPS Simulator</td><td>`NODE_ENV !== 'production'` or `ENABLE_GPS_SIM=true`</td><td>Never triggers (unless explicitly enabled)</td></tr><tr><td>`skipProximityCheck`</td><td>`NODE_ENV !== 'production'`</td><td>GPS proximity enforced</td></tr><tr><td>`prisma db seed`</td><td>`NODE_ENV === 'production'` exits</td><td>Seeding blocked</td></tr><tr><td>CORS origins</td><td>`allowedOrigins` whitelist (env-driven)</td><td>Same restrictions as API</td></tr></tbody></table>
+<p><strong>Pre-deployment verification checklist:</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> <code>NODE_ENV=production</code> is set in Cloud Run environment</li>
+<li><input disabled="" type="checkbox"> No seed test users/drivers exist in production database</li>
+<li><input disabled="" type="checkbox"> <code>skipProximityCheck</code> is confirmed <code>false</code> via <code>/api/state</code> response</li>
+<li><input disabled="" type="checkbox"> <code>.env</code> with real credentials is NOT in git (use Secret Manager)</li>
+<li><input disabled="" type="checkbox"> Xendit keys are real production keys (not <code>xnd_development_dummy_*</code>)</li>
+<li><input disabled="" type="checkbox"> Frontend quick-login buttons are hidden (detect via <code>NODE_ENV</code> or build flag)</li>
+<li><input disabled="" type="checkbox"> Passenger/driver web access is blocked in production (see §C.16)</li>
+</ul>
+<h3 id="c-16-platform-access-policy-mobile-only-in-production">C.16 Platform Access Policy — Mobile-Only in Production </h3>
+<p>In production, the <strong>passenger and driver apps are mobile-only</strong> (Capacitor Android/iOS). Web browser access to <code>passenger.html</code> and <code>driver.html</code> must be blocked. The <strong>admin dashboard remains web-only</strong> (no Capacitor app needed).</p>
+<p><strong>Staging/dev:</strong> Web access stays enabled for all apps — developers and testers need browser access for debugging, design iteration, and QA workflows.</p>
+<p><strong>Implementation approach (pre-launch cleanup):</strong></p>
+<ol>
+<li><strong>Server-side middleware</strong> — Check <code>X-Jeepi-Platform</code> header on passenger/driver HTML routes. In <code>NODE_ENV=production</code>, serve a &quot;Download the app&quot; landing page instead of the web app if header is missing or is <code>web</code>. Admin routes are exempt.</li>
+<li><strong>Alternative: Separate deployments</strong> — Serve admin from its own Cloud Run service. Passenger/driver HTML files are never deployed to the web-facing service in production (only bundled into Capacitor apps via <code>cap-sync.js</code>).</li>
+<li><strong>API access</strong> — API endpoints remain accessible to both web (admin) and mobile (passenger/driver). The <code>X-Jeepi-Platform</code> header is logged for analytics but not enforced at the API layer.</li>
+</ol>
+<p><strong>Effort:</strong> ~1 day AI-assisted. Mostly a middleware guard + a simple redirect page.</p>
+<hr>
+<h2 id="regulatory-compliance-checklist">Regulatory Compliance Checklist </h2>
+<table><thead><tr><th>Requirement</th><th>Regulator</th><th>Phase</th><th>Priority</th></tr></thead><tbody><tr><td>BSP Electronic Money Issuer (EMI) license</td><td>BSP</td><td>File at Phase 1 start</td><td>🔴 Critical</td></tr><tr><td>DPO designation + NPC registration</td><td>NPC</td><td>Phase 3</td><td>🔴 Critical</td></tr><tr><td>Privacy Impact Assessment filing</td><td>NPC</td><td>Phase 3</td><td>🔴 Critical</td></tr><tr><td>AMLC registration as covered institution</td><td>AMLC</td><td>Phase 4</td><td>🔴 Critical</td></tr><tr><td>Privacy Policy v1.0 published</td><td>NPC</td><td>Phase 3</td><td>🟡 High</td></tr><tr><td>AMLA KYC policies and procedures</td><td>AMLC</td><td>Phase 4</td><td>🟡 High</td></tr><tr><td>LTFRB franchise coordination</td><td>LTFRB</td><td>Before market launch</td><td>🟡 High</td></tr><tr><td>Data breach notification procedure</td><td>NPC</td><td>Phase 3</td><td>🟡 High</td></tr><tr><td>LTO driver license verification MOU</td><td>LTO</td><td>Phase 3</td><td>🟢 Medium</td></tr><tr><td>QR Ph merchant registration with BSP-approved PSP</td><td>BSP</td><td>Phase 3 (start), Phase 4+ (go-live)</td><td>🟡 High</td></tr><tr><td>PCI-DSS (Xendit handles card storage — minimal scope)</td><td>PCI</td><td>Phase 4</td><td>🟢 Medium</td></tr><tr><td>App Store / Play Store financial app review</td><td>Apple/Google</td><td>Phase 2</td><td>🟢 Medium</td></tr></tbody></table>
+<hr>
+<h2 id="key-risk-register">Key Risk Register </h2>
+<table><thead><tr><th>Risk</th><th>Impact</th><th>Mitigation</th></tr></thead><tbody><tr><td>BSP EMI license delayed (6–12 months)</td><td>High</td><td>Operate under Xendit EMI partnership; limit to ₱500 unverified</td></tr><tr><td>iOS BLE Peripheral stops if driver app backgrounded</td><td>Medium</td><td>Wake lock on trip start prevents accidental background. Driver must keep app open (already required for payment processing).</td></tr><tr><td>Socket.io Redis adapter under load</td><td>Medium</td><td>Load test with k6 pre-launch; single-instance fallback plan</td></tr><tr><td>Xendit webhook delivery failure</td><td>High</td><td>Redis-backed retry queue; poll Xendit API for unconfirmed charges</td></tr><tr><td>GPS spoofing by sophisticated users</td><td>Medium</td><td>BLE quorum makes GPS-only spoofing insufficient</td></tr><tr><td>Cloud Run cold starts for financial operations</td><td>High</td><td>min_instances: 2 for API service eliminates cold starts</td></tr><tr><td>Connectivity loss mid-trip</td><td>High</td><td>Offline queue with idempotency keys + 2h TTL auto-resolve (§C.1)</td></tr><tr><td>Database loss / corruption</td><td>Critical</td><td>Cloud SQL automated backups + Redis persistence, restore within 1h (§C.2)</td></tr><tr><td>Registration bot abuse</td><td>Medium</td><td>Cloudflare Turnstile (free) + device fingerprinting + rate limiting (§C.4)</td></tr><tr><td>Xendit float insufficient for driver payouts</td><td>High</td><td>Minimum float policy + threshold alerts to founders (§C.7)</td></tr><tr><td>App Store / Play Store 30% tax on wallet top-ups</td><td>Low</td><td>Jeepi qualifies as real-world service payments — exempt from IAP requirement (§C.12)</td></tr><tr><td>Post-quantum "harvest now, decrypt later" for TLS traffic</td><td>Low (10-15 yr)</td><td>GCP Cloud Run uses Google-managed TLS with hybrid PQC rollout; monitor NIST standards (§C.13)</td></tr><tr><td>Test features leaking to production</td><td>Critical</td><td>NODE_ENV guards on all test/sim features; pre-deployment checklist (§C.15)</td></tr><tr><td>Production log access for debugging</td><td>Medium</td><td>Structured pino logging + Cloud Logging + gcloud CLI access for AI agents (§C.14)</td></tr></tbody></table>
+<hr>
+<h2 id="critical-files-to-modify">Critical Files to Modify </h2>
+<table><thead><tr><th>File</th><th>Phase</th><th>Changes</th></tr></thead><tbody><tr><td>`server.js`</td><td>0</td><td>Split into route modules, security fixes, dead code removal</td></tr><tr><td>`services/payment-service.js`</td><td>0</td><td>NEW — unified fare calc, balance validation, settlement</td></tr><tr><td>`constants.js`</td><td>0</td><td>NEW — magic numbers extracted</td></tr><tr><td>`middleware/auth.js`</td><td>0</td><td>NEW — verifySession extracted + session bypass fix</td></tr><tr><td>`middleware/validation.js`</td><td>0</td><td>NEW — input validation</td></tr><tr><td>`test/`</td><td>0</td><td>NEW — Vitest + Supertest test suite</td></tr><tr><td>`prisma/schema.prisma`</td><td>1</td><td>PostgreSQL provider, all new models</td></tr><tr><td>`server.js`</td><td>1</td><td>Split into api/realtime, Redis migration, audit log hooks</td></tr><tr><td>`services/storage.js`</td><td>1</td><td>Now port-agnostic (same-origin detection); production uses domain URLs</td></tr><tr><td>`services/api-url.js`</td><td>2A</td><td>NEW — Capacitor URL detection + `JeepiConfig.getApiBase()`</td></tr><tr><td>`middleware/request-context.js`</td><td>2B</td><td>NEW — request context enrichment + Cloud Trace correlation</td></tr><tr><td>`scripts/cap-sync.js`</td><td>2C</td><td>NEW — Capacitor build script (copy files, generate config.js, cap sync)</td></tr><tr><td>`mobile/passenger/`</td><td>2C</td><td>NEW — Capacitor project (`ph.jeepi.passenger`, Android initialized)</td></tr><tr><td>`mobile/driver/`</td><td>2C</td><td>NEW — Capacitor project (`ph.jeepi.driver`, Android initialized)</td></tr><tr><td>`services/gps.js`</td><td>2</td><td>`@capacitor/geolocation` + BLE pulse attachment</td></tr><tr><td>`services/geo.js`</td><td>5</td><td>Spoofing detection rules, quorum logic</td></tr><tr><td>`pages/passenger.js`</td><td>2,7,8</td><td>Notification bell, Dagdag Bayad / Libre Ka-Jeepi UI</td></tr><tr><td>`pages/passenger-friends.js`</td><td>7</td><td>Friends lifecycle (cancel, block, QR add, nearby)</td></tr><tr><td>`pages/driver.js`</td><td>2,8</td><td>BLE advertising, group seat display</td></tr><tr><td>`services/payment-gateway.js`</td><td>4</td><td>NEW — PaymentGateway facade + adapter interface</td></tr><tr><td>`services/adapters/xendit-adapter.js`</td><td>4</td><td>NEW — Xendit-specific implementation (launch gateway)</td></tr><tr><td>`services/adapters/qrph-adapter.js`</td><td>4+</td><td>NEW — QR Ph zero-fee top-ups via InstaPay (post-launch)</td></tr><tr><td>`components/reload-modal.js`</td><td>4</td><td>Wire to PaymentGateway.createCharge()</td></tr><tr><td>`pages/admin-*.js`</td><td>3,6</td><td>KYC queue, founders dashboard</td></tr></tbody></table>
+<hr>
+<h2 id="open-questions-for-discussion">Open Questions for Discussion </h2>
+<ol>
+<li><del><strong>Mobile distribution:</strong></del> <strong>Resolved:</strong> App Store + Google Play Store as primary. Plan sideloading (APK direct download) for phones without store access.</li>
+<li><del><strong>Data monetization timing:</strong></del> <strong>Resolved:</strong> Defer BigQuery pipeline until sufficient data volume/buyers exist. Source data (AuditLog, LocationLog, Transaction) is comprehensive from Phase 3/5 onward — the pipeline is a trivial ETL job to add later (~2-3 days).</li>
+<li><del><strong>BLE on older devices:</strong></del> <strong>Resolved:</strong> Target Android 5.0+ (API 21) for BLE Peripheral. During pilot, survey driver device capabilities. If adoption is blocked by hardware, BLE becomes optional — the layered scoring system (QR+GPS = 80pts) already works without it.</li>
+<li><del><strong>Xendit partnership:</strong></del> <strong>Resolved:</strong> Not yet contacted. Xendit dev work is ~3-4 weeks (Phase 4, months 9-10). Xendit onboarding takes 2-6 weeks on their side. <strong>Approach Xendit around month 6-7</strong> (during Phase 3) to have sandbox access for testing and production keys ready by Phase 4 start.</li>
+</ol>
+<h3 id="resolved-decisions">Resolved Decisions </h3>
+<ul>
+<li><strong>Mobile stack:</strong> Capacitor.js (wrap existing vanilla JS, no rewrite)</li>
+<li><strong>Operator model:</strong> Driver can be owner-operator (one person, two accounts)</li>
+<li><strong>Launch priority:</strong> Mobile + limited pilot first, compliance in parallel</li>
+<li><strong>Proximity strategy:</strong> Layered confidence score (QR + GPS + optional BLE), not binary gate</li>
+<li><strong>BLE approach:</strong> Driver phone as BLE Peripheral (no hardware cost), sustained by foreground requirement during trips</li>
+</ul>
+
+</main>
+
+</body>
+</html>

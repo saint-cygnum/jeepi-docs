@@ -1,0 +1,1285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jeepi — Production Rollout &amp; Financial Projections</title>
+<style>
+  :root {
+    --jeepi-primary: #1a73e8;
+    --jeepi-dark: #0d47a1;
+    --infra: #1565c0;
+    --mobile: #00897b;
+    --compliance: #ef6c00;
+    --payments: #6a1b9a;
+    --features: #2e7d32;
+    --milestone: #c62828;
+    --revenue: #2e7d32;
+    --cost: #c62828;
+    --profit: #1565c0;
+    --bg: #fafbfd;
+    --card-bg: #ffffff;
+    --text: #1a1a2e;
+    --text-light: #5f6368;
+    --border: #e0e0e0;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 40px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 32px;
+    padding-bottom: 20px;
+    border-bottom: 3px solid var(--jeepi-primary);
+  }
+  .header-left h1 {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--jeepi-dark);
+    letter-spacing: -0.5px;
+  }
+  .header-left p {
+    font-size: 14px;
+    color: var(--text-light);
+    margin-top: 4px;
+  }
+  .header-right {
+    text-align: right;
+    font-size: 13px;
+    color: var(--text-light);
+  }
+
+  .summary {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 16px;
+    margin-bottom: 36px;
+  }
+  .card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+    text-align: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+  .card .value {
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--jeepi-primary);
+  }
+  .card .value.green { color: var(--revenue); }
+  .card .label {
+    font-size: 12px;
+    color: var(--text-light);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-top: 4px;
+  }
+
+  .section-title {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 20px;
+    color: var(--text);
+  }
+
+  /* Gantt Chart */
+  .gantt-container {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px 28px 20px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    overflow-x: auto;
+    margin-bottom: 28px;
+  }
+
+  .gantt {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    min-width: 900px;
+  }
+  .gantt thead th {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-light);
+    padding: 6px 0 12px;
+    text-align: center;
+    border-bottom: 2px solid var(--border);
+  }
+  .gantt thead th:first-child {
+    text-align: left;
+    padding-left: 4px;
+    width: 220px;
+    min-width: 220px;
+  }
+  .gantt tbody td {
+    padding: 0;
+    height: 44px;
+    vertical-align: middle;
+    position: relative;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  .gantt tbody td:first-child {
+    padding: 0 12px 0 4px;
+    font-size: 13px;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .gantt tbody tr:last-child td { border-bottom: none; }
+
+  .phase-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .phase-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    font-size: 11px;
+    font-weight: 700;
+    color: #fff;
+    flex-shrink: 0;
+  }
+
+  .bar {
+    position: absolute;
+    top: 10px;
+    height: 24px;
+    border-radius: 6px;
+    opacity: 0.9;
+    transition: opacity 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.95);
+    letter-spacing: 0.3px;
+    cursor: default;
+  }
+  .bar:hover {
+    opacity: 1;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  }
+
+  .milestone-row td {
+    height: 52px !important;
+    border-bottom: none !important;
+  }
+  .milestone-marker {
+    position: absolute;
+    top: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    transform: translateX(-50%);
+    z-index: 2;
+  }
+  .milestone-diamond {
+    width: 16px;
+    height: 16px;
+    background: var(--milestone);
+    transform: rotate(45deg);
+    border-radius: 2px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  }
+  .milestone-label {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--milestone);
+    margin-top: 4px;
+    white-space: nowrap;
+  }
+
+  .bsp-bar {
+    position: absolute;
+    top: 14px;
+    height: 16px;
+    border: 2px dashed #b71c1c;
+    border-radius: 8px;
+    background: rgba(198, 40, 40, 0.06);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 600;
+    color: #b71c1c;
+    letter-spacing: 0.3px;
+  }
+
+  .legend {
+    display: flex;
+    gap: 24px;
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text-light);
+  }
+  .legend-swatch {
+    width: 14px;
+    height: 14px;
+    border-radius: 4px;
+  }
+  .legend-diamond {
+    width: 10px;
+    height: 10px;
+    background: var(--milestone);
+    transform: rotate(45deg);
+    border-radius: 1px;
+  }
+  .legend-dashed {
+    width: 14px;
+    height: 10px;
+    border: 2px dashed #b71c1c;
+    border-radius: 3px;
+  }
+
+  /* Financial Chart */
+  .chart-container {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    margin-bottom: 28px;
+  }
+  .chart-canvas-wrap {
+    position: relative;
+    width: 100%;
+    height: 400px;
+    margin-top: 16px;
+  }
+  .chart-canvas-wrap canvas {
+    width: 100%;
+    height: 100%;
+  }
+  .chart-legend {
+    display: flex;
+    gap: 28px;
+    margin-top: 16px;
+    justify-content: center;
+  }
+  .chart-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--text);
+  }
+  .chart-legend-line {
+    width: 24px;
+    height: 3px;
+    border-radius: 2px;
+  }
+  .chart-legend-area {
+    width: 24px;
+    height: 14px;
+    border-radius: 3px;
+    opacity: 0.3;
+  }
+
+  /* Data Table */
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    margin-top: 16px;
+  }
+  .data-table th {
+    background: #f5f5f7;
+    padding: 8px 10px;
+    text-align: right;
+    font-weight: 600;
+    color: var(--text-light);
+    border-bottom: 2px solid var(--border);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .data-table th:first-child { text-align: left; }
+  .data-table td {
+    padding: 6px 10px;
+    text-align: right;
+    border-bottom: 1px solid #f0f0f0;
+    color: var(--text);
+  }
+  .data-table td:first-child {
+    text-align: left;
+    font-weight: 500;
+  }
+  .data-table tr:hover td { background: #fafbfd; }
+  .data-table .positive { color: var(--revenue); font-weight: 600; }
+  .data-table .negative { color: var(--cost); font-weight: 600; }
+  .data-table .break-even { background: #e8f5e9 !important; }
+  .data-table .subtotal td {
+    font-weight: 700;
+    border-top: 2px solid var(--border);
+    background: #f5f5f7;
+  }
+
+  /* Bottom Section */
+  .bottom-section {
+    margin-top: 28px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+  .bottom-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 22px 24px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+  .bottom-card h3 {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 14px;
+    color: var(--text);
+  }
+  .milestone-list {
+    list-style: none;
+  }
+  .milestone-list li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 0;
+    font-size: 13px;
+    color: var(--text);
+    border-bottom: 1px solid #f5f5f5;
+  }
+  .milestone-list li:last-child { border-bottom: none; }
+  .milestone-list .month-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 32px;
+    height: 22px;
+    padding: 0 6px;
+    background: var(--milestone);
+    color: #fff;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .info-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    font-size: 13px;
+    border-bottom: 1px solid #f5f5f5;
+  }
+  .info-row:last-child { border-bottom: none; }
+  .info-row .info-label { color: var(--text-light); }
+  .info-row .info-value { font-weight: 600; color: var(--jeepi-primary); }
+
+  /* Cross-cutting section */
+  .crosscut-section {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 22px 24px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    margin-bottom: 28px;
+    margin-top: 28px;
+  }
+  .crosscut-section h3 {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 14px;
+    color: var(--text);
+  }
+  .crosscut-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+  .crosscut-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--text);
+    padding: 8px 10px;
+    background: #f8f9fa;
+    border-radius: 6px;
+    border-left: 3px solid var(--jeepi-primary);
+  }
+  .crosscut-item .cc-phase {
+    font-size: 10px;
+    color: var(--text-light);
+    background: #e8eaed;
+    border-radius: 3px;
+    padding: 1px 5px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .crosscut-item .cc-label { font-weight: 500; }
+
+  /* Dev Cost Section */
+  .dev-cost-container {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    margin-bottom: 28px;
+  }
+  .dev-cost-container h2 {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 6px;
+  }
+  .dev-cost-subtitle {
+    font-size: 12px;
+    color: var(--text-light);
+    margin-bottom: 20px;
+  }
+  .dev-cost-columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+  .dev-cost-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  .dev-cost-table th {
+    text-align: left;
+    padding: 8px 10px;
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-light);
+    border-bottom: 2px solid var(--border);
+  }
+  .dev-cost-table th:nth-child(2),
+  .dev-cost-table th:nth-child(3) { text-align: right; }
+  .dev-cost-table td {
+    padding: 8px 10px;
+    border-bottom: 1px solid #f0f0f0;
+    color: var(--text);
+  }
+  .dev-cost-table td:nth-child(2),
+  .dev-cost-table td:nth-child(3) {
+    text-align: right;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .dev-cost-table tr.total-row td {
+    border-bottom: none;
+    border-top: 2px solid var(--border);
+    font-weight: 700;
+    font-size: 14px;
+    padding-top: 12px;
+  }
+  .dev-cost-table tr.total-row td:nth-child(2) { color: var(--cost); }
+  .dev-cost-table tr.total-row td:nth-child(3) { color: var(--revenue); }
+  .dev-cost-table .sub-item { padding-left: 20px; color: var(--text-light); font-size: 12px; }
+  .dev-cost-table .buffer-row td { color: var(--text-light); font-style: italic; }
+  .dev-cost-note {
+    font-size: 11px;
+    color: var(--text-light);
+    margin-top: 6px;
+    line-height: 1.5;
+  }
+  .dev-savings-bar {
+    margin-top: 20px;
+    background: #f8f9fa;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+  }
+  .dev-savings-bar h4 {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 10px;
+    color: var(--text);
+  }
+  .savings-visual {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    height: 28px;
+    border-radius: 6px;
+    overflow: hidden;
+    margin-bottom: 8px;
+  }
+  .savings-segment {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: 0.3px;
+  }
+  .savings-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--text-light);
+  }
+
+  /* Assumptions */
+  .assumptions {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 22px 24px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    margin-top: 20px;
+    margin-bottom: 28px;
+  }
+  .assumptions h3 {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 10px;
+  }
+  .assumptions ul {
+    margin-left: 18px;
+    font-size: 13px;
+    color: var(--text-light);
+    line-height: 1.7;
+  }
+
+  .footer {
+    margin-top: 28px;
+    text-align: center;
+    font-size: 11px;
+    color: var(--text-light);
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+  }
+
+  @media print {
+    body { padding: 20px; background: #fff; }
+    .gantt-container, .card, .bottom-card, .chart-container, .assumptions, .dev-cost-container, .crosscut-section {
+      box-shadow: none;
+      break-inside: avoid;
+    }
+    .bar:hover { box-shadow: none; }
+    @page { size: landscape; margin: 15mm; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <h1>Jeepi &mdash; Rollout &amp; Financial Projections</h1>
+    <p>Philippine Jeepney Cashless Payment Platform &mdash; 24-Month Business Plan</p>
+  </div>
+  <div class="header-right">
+    <div>February 2026</div>
+    <div style="font-weight:600; color: var(--jeepi-primary);">CONFIDENTIAL</div>
+  </div>
+</div>
+
+<div class="summary">
+  <div class="card">
+    <div class="value">10</div>
+    <div class="label">Phases</div>
+  </div>
+  <div class="card">
+    <div class="value">263+8</div>
+    <div class="label">Vitest + E2E Tests</div>
+  </div>
+  <div class="card">
+    <div class="value">8-10mo</div>
+    <div class="label">Timeline (AI)</div>
+  </div>
+  <div class="card">
+    <div class="value" style="color:var(--cost)">P810K</div>
+    <div class="label">Initial Investment</div>
+  </div>
+  <div class="card">
+    <div class="value green">24mo</div>
+    <div class="label">Projection</div>
+  </div>
+</div>
+
+<!-- Development Timeline -->
+<div class="gantt-container">
+  <div class="section-title">Development Timeline (AI-Assisted Estimates)</div>
+  <table class="gantt" id="ganttChart">
+    <thead>
+      <tr>
+        <th>Phase</th>
+        <th>M1</th><th>M2</th><th>M3</th><th>M4</th><th>M5</th><th>M6</th>
+        <th>M7</th><th>M8</th><th>M9</th><th>M10</th><th>M11</th><th>M12</th><th>M13</th>
+      </tr>
+    </thead>
+    <tbody id="ganttBody"></tbody>
+  </table>
+
+  <div class="legend">
+    <div class="legend-item"><div class="legend-swatch" style="background:var(--infra)"></div> Infrastructure</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:var(--mobile)"></div> Mobile</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:var(--compliance)"></div> Compliance</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:var(--payments)"></div> Payments</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:var(--features)"></div> Features</div>
+    <div class="legend-item"><div class="legend-diamond"></div> Milestone</div>
+    <div class="legend-item"><div class="legend-dashed"></div> Regulatory (Background)</div>
+  </div>
+</div>
+
+<!-- Revenue & Cost Projection Chart -->
+<div class="chart-container">
+  <div class="section-title">24-Month Revenue &amp; Cost Projection (PHP)</div>
+  <div class="chart-canvas-wrap">
+    <canvas id="financialChart"></canvas>
+  </div>
+  <div class="chart-legend">
+    <div class="chart-legend-item"><div class="chart-legend-line" style="background:var(--revenue)"></div> Monthly Revenue</div>
+    <div class="chart-legend-item"><div class="chart-legend-line" style="background:var(--cost)"></div> Monthly Costs</div>
+    <div class="chart-legend-item"><div class="chart-legend-area" style="background:var(--profit)"></div> Cumulative P&amp;L (incl. dev investment)</div>
+  </div>
+</div>
+
+<!-- Data Table -->
+<div class="chart-container">
+  <div class="section-title">Monthly Breakdown (PHP)</div>
+  <table class="data-table" id="dataTable">
+    <thead>
+      <tr>
+        <th>Month</th>
+        <th>DAU</th>
+        <th>Rides/Day</th>
+        <th>Revenue</th>
+        <th>Dev Cost</th>
+        <th>Infra</th>
+        <th>Payments</th>
+        <th>Total Cost</th>
+        <th>Net</th>
+        <th>Cumulative</th>
+      </tr>
+    </thead>
+    <tbody id="dataBody"></tbody>
+  </table>
+</div>
+
+<div class="bottom-section">
+  <div class="bottom-card">
+    <h3>Key Milestones</h3>
+    <ul class="milestone-list">
+      <li><span class="month-badge">M1</span> Clean codebase &amp; test foundation ready</li>
+      <li><span class="month-badge">M6</span> Limited pilot launch (internal testers)</li>
+      <li><span class="month-badge">M8</span> Approach Xendit for payment integration</li>
+      <li><span class="month-badge">M11</span> Production launch &mdash; real money</li>
+      <li><span class="month-badge">M13</span> Full feature set complete</li>
+    </ul>
+  </div>
+  <div class="bottom-card">
+    <h3>Project Summary</h3>
+    <div class="info-row"><span class="info-label">Status</span><span class="info-value">Phases 0-2.5 Complete, Phase 3 In-Progress</span></div>
+    <div class="info-row"><span class="info-label">Tech Stack</span><span class="info-value">Node.js + Prisma + Neon PostgreSQL</span></div>
+    <div class="info-row"><span class="info-label">Mobile</span><span class="info-value">Capacitor 8 + BLE + FCM Push</span></div>
+    <div class="info-row"><span class="info-label">Initial Investment</span><span class="info-value" style="color:var(--cost)">P810K (AI-assisted)</span></div>
+    <div class="info-row"><span class="info-label">Traditional Cost</span><span class="info-value">~P6.75M (88% saved)</span></div>
+    <div class="info-row"><span class="info-label">Monthly Hosting</span><span class="info-value">P5.6K&ndash;P33.6K</span></div>
+    <div class="info-row"><span class="info-label">Revenue Model</span><span class="info-value">&#8369;0.99/ride fee</span></div>
+    <div class="info-row"><span class="info-label">Target M24 DAU</span><span class="info-value">25,000</span></div>
+  </div>
+</div>
+
+<div class="crosscut-section">
+  <h3>Cross-Cutting Concerns (Woven Across Phases)</h3>
+  <div class="crosscut-grid">
+    <div class="crosscut-item"><span class="cc-phase">Ph 1-7</span><span class="cc-label">Offline Resilience &mdash; queue-and-retry with idempotency keys, 2h auto-resolve</span></div>
+    <div class="crosscut-item"><span class="cc-phase">Ph 1</span><span class="cc-label">Disaster Recovery &mdash; Cloud SQL backups + Redis persistence (~P112/mo)</span></div>
+    <div class="crosscut-item"><span class="cc-phase">Ph 1-2</span><span class="cc-label">API Versioning &mdash; URL-based (/api/v1/) + minimum app version check</span></div>
+    <div class="crosscut-item"><span class="cc-phase">Ph 0-2</span><span class="cc-label">Rate Limiting &mdash; express-rate-limit + Cloudflare Turnstile (free)</span></div>
+    <div class="crosscut-item"><span class="cc-phase">Ph 2-7</span><span class="cc-label">Ticket System &mdash; 3 sources (spoofing, user reports, support form) &rarr; unified queue</span></div>
+    <div class="crosscut-item"><span class="cc-phase">Ph 2</span><span class="cc-label">FAQ Pages &mdash; bilingual (EN/FIL) for passengers and drivers</span></div>
+    <div class="crosscut-item"><span class="cc-phase">Ph 6</span><span class="cc-label">Driver Cash-Out &mdash; Xendit Disbursements (GCash, Maya, bank) + float management</span></div>
+    <div class="crosscut-item"><span class="cc-phase">Ph 2</span><span class="cc-label">Battery Optimization &mdash; adaptive GPS/BLE intervals, battery-aware mode</span></div>
+    <div class="crosscut-item"><span class="cc-phase">Ph 5</span><span class="cc-label">Terms of Service &mdash; PH fintech-compliant ToS + Privacy Policy template</span></div>
+    <div class="crosscut-item"><span class="cc-phase">Ph 1-8</span><span class="cc-label">Product Analytics &mdash; structured events from Day 1, BigQuery export</span></div>
+    <div class="crosscut-item"><span class="cc-phase">Ph 2</span><span class="cc-label">Driver Onboarding &mdash; first-ride walkthrough, training mode, FAQ links</span></div>
+    <div class="crosscut-item"><span class="cc-phase">Ph 6</span><span class="cc-label">App Store Tax &mdash; exempt (real-world service), web portal fallback</span></div>
+  </div>
+</div>
+
+<!-- One-Time Development Investment -->
+<div class="dev-cost-container">
+  <h2>One-Time Development Investment (PHP)</h2>
+  <div class="dev-cost-subtitle">Total cost to build Jeepi from codebase to production launch, including post-launch stabilization. Buffers include scope creep, requirements mismatches, regressions, and iteration cycles.</div>
+  <div class="dev-cost-columns">
+    <div>
+      <table class="dev-cost-table">
+        <thead>
+          <tr><th>AI-Assisted (1 Dev + Claude)</th><th>Low</th><th>High</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>AI-assisted development (1 dev &times; 10 months)</td><td>&#8369;200,000</td><td>&#8369;300,000</td></tr>
+          <tr class="buffer-row"><td class="sub-item">Senior PH dev rate: P20K-30K/mo</td><td></td><td></td></tr>
+          <tr><td>Bug fixes, regressions, scope creep (30%)</td><td>&#8369;60,000</td><td>&#8369;90,000</td></tr>
+          <tr class="buffer-row"><td class="sub-item">Requirements changes, iteration cycles, hotfixes</td><td></td><td></td></tr>
+          <tr><td>AI tools (Claude Max + Copilot &times; 10 mo)</td><td>&#8369;123,000</td><td>&#8369;123,000</td></tr>
+          <tr class="buffer-row"><td class="sub-item">Claude Code Max P11.2K + Copilot P1.1K/mo</td><td></td><td></td></tr>
+          <tr><td>Legal/compliance (BSP EMI, NPC, SEC/DTI)</td><td>&#8369;80,000</td><td>&#8369;150,000</td></tr>
+          <tr><td>Design &amp; branding (logo, UX, assets)</td><td>&#8369;75,000</td><td>&#8369;100,000</td></tr>
+          <tr><td>Infrastructure setup (GCP, domains, SSL)</td><td>&#8369;20,000</td><td>&#8369;35,000</td></tr>
+          <tr><td>Contingency (20%)</td><td>&#8369;112,000</td><td>&#8369;160,000</td></tr>
+          <tr class="total-row"><td><strong>Total AI-Assisted</strong></td><td>&#8369;670,000</td><td>&#8369;958,000</td></tr>
+        </tbody>
+      </table>
+      <div class="dev-cost-note">
+        <strong>Midpoint: ~&#8369;810K (~$14.5K USD)</strong> &mdash; All-in cost from zero to production-ready app with 10 completed phases, including iteration cycles, 3-month post-launch bug fix buffer, and regulatory filings.
+      </div>
+    </div>
+    <div>
+      <table class="dev-cost-table">
+        <thead>
+          <tr><th>Human-Only (2-3 Devs, no AI)</th><th>Low</th><th>High</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Development labor (2-3 devs &times; 15-21 months)</td><td>&#8369;2,700,000</td><td>&#8369;5,040,000</td></tr>
+          <tr class="buffer-row"><td class="sub-item">P60K-80K/dev/mo &times; 2-3 devs</td><td></td><td></td></tr>
+          <tr><td>Overhead (standups, PRs, coordination) @ 20%</td><td>&#8369;540,000</td><td>&#8369;1,008,000</td></tr>
+          <tr><td>Bug fixes, regressions, scope creep (35%)</td><td>&#8369;1,134,000</td><td>&#8369;2,116,800</td></tr>
+          <tr class="buffer-row"><td class="sub-item">Integration bugs, manual testing, rework cycles</td><td></td><td></td></tr>
+          <tr><td>PM/design/infrastructure tools</td><td>&#8369;80,000</td><td>&#8369;150,000</td></tr>
+          <tr><td>Legal/compliance</td><td>&#8369;80,000</td><td>&#8369;150,000</td></tr>
+          <tr><td>Contingency (20%)</td><td>&#8369;907,000</td><td>&#8369;1,693,000</td></tr>
+          <tr class="total-row"><td><strong>Total Human-Only</strong></td><td>&#8369;5,441,000</td><td>&#8369;10,158,000</td></tr>
+        </tbody>
+      </table>
+      <div class="dev-cost-note">
+        <strong>Midpoint: ~&#8369;6.75M (~$120K USD)</strong> &mdash; Traditional team with higher coordination overhead, manual testing, longer iteration cycles. 35% buffer reflects industry norms for fintech projects.
+      </div>
+    </div>
+  </div>
+
+  <div class="dev-savings-bar">
+    <h4>AI-Assisted Savings: 88% cost reduction, 50% faster delivery</h4>
+    <div class="savings-visual">
+      <div class="savings-segment" style="width:12%; background:var(--revenue);">AI: ~P810K</div>
+      <div class="savings-segment" style="width:88%; background:var(--cost); opacity:0.5;">Saved: ~P5.9M</div>
+    </div>
+    <div class="savings-labels">
+      <span>AI-Assisted: P670K&ndash;P958K (8-10 months)</span>
+      <span>Human-Only: P5.4M&ndash;P10.2M (15-21 months)</span>
+    </div>
+  </div>
+</div>
+
+<div class="assumptions">
+  <h3>Revenue Model Assumptions</h3>
+  <ul>
+    <li><strong>One-off development cost:</strong> &#8369;810,000 all-in (Month 1) &mdash; AI-assisted dev P250K + iteration/buffer P75K + AI tools P123K + legal/compliance P120K + design/branding P100K + infrastructure P35K + contingency 20% P107K. Traditional dev cost would be ~&#8369;6.75M (see Dev Investment section above).</li>
+    <li><strong>Rider mix:</strong> 65% regular / 25% student / 7% senior / 3% PWD</li>
+    <li><strong>Fare structure:</strong> Regular &#8369;25, discounted &#8369;20 (&minus;20% per RA 11314, RA 9994, RA 10754)</li>
+    <li><strong>Convenience fee:</strong> Regular &#8369;1.20/ride (&#8369;1.00 passenger + &#8369;0.20 driver), discounted &#8369;0.60/ride (&minus;50%). Blended avg &#8369;0.99/ride.</li>
+    <li><strong>DAU growth:</strong> 0 during dev (M1-5), 50 at pilot (M6), scaling to 25,000 DAU by M24 (organic + partnership with jeepney operators)</li>
+    <li><strong>Ride frequency:</strong> ~0.5 rides per DAU per day (commuters ride 1-2x, averaged with occasional users)</li>
+    <li><strong>Payment processing:</strong> 2.0% at launch (Xendit standard) &rarr; 1.0% at scale (QR Ph adoption + volume discount)</li>
+    <li><strong>Infrastructure scales:</strong> GCP Cloud Run + Cloud SQL (asia-southeast1), &#8369;280/mo dev &rarr; &#8369;33,600/mo at full scale</li>
+    <li><strong>GCP tiers:</strong> Cloud Run &#8369;0-8,400 | Cloud SQL &#8369;0-6,720 | Redis &#8369;0-3,920 | CDN &#8369;0-1,400 | Build/CI &#8369;0-840 | Armor/LB &#8369;0-1,680 | Other &#8369;280-840</li>
+    <li><strong>Payment fees (Xendit):</strong> GCash 2.3% | Maya 1.8% | GrabPay 2.0% | Card 3.0%+&#8369;17 | BancNet 1.5-2.0% | InstaPay &#8369;0-15 | OTC &#8369;15-25 flat</li>
+    <li><strong>Post-launch adapters:</strong> QR Ph (BSP standard) &#8369;0 | GCash Direct ~1.5% | ShopeePay ~2.0% | Apple/Google Pay ~2.5%</li>
+    <li><strong>No marketing/staff costs included</strong> &mdash; organic growth only. Paid acquisition would accelerate growth but increase costs.</li>
+    <li><strong>FX rate:</strong> &#8369;56 = $1 USD (for reference conversions only; all projections in PHP)</li>
+  </ul>
+</div>
+
+<div class="footer">
+  Jeepi &copy; 2026 &mdash; Confidential. For internal planning use only.
+  <br>Development costs based on Philippine local developer rates. Bug fix buffer: 30% AI / 35% human (padded for fintech scope creep, requirements mismatches, regressions). AI tooling: Claude Code Max (&#8369;11,200/mo), GitHub Copilot (&#8369;1,064/mo).
+  <br>See also: <a href="./dev_estimates.md">Dev Estimates</a> | <a href="./production_rollout_strategy.md">Rollout Strategy</a> | <a href="./code_review_and_testing_strategy.md">Code Review</a>
+</div>
+
+<script>
+// ============================================================
+// GANTT CHART
+// ============================================================
+const GANTT_MONTHS = 13;
+const COL_WIDTH = 100 / GANTT_MONTHS;
+
+const phases = [
+  { num: 0, name: 'Codebase Refactor & Testing', start: 1, end: 1, cat: 'infra', label: '2-3w' },
+  { num: 1, name: 'Foundation (DB + Infra)',      start: 2, end: 3, cat: 'infra', label: '6-8w' },
+  { num: 2, name: 'Mobile (Capacitor + BLE)',     start: 4, end: 6, cat: 'mobile', label: '8-10w' },
+  { num: 9, name: 'UX Polishing & Branding',      start: 4, end: 6, cat: 'mobile', label: '2-3w \u2705' },
+  { num: 5, name: 'Compliance (KYC + Audit)',     start: 5, end: 9, cat: 'compliance', label: '7-9w \u2705' },
+  { num: 3, name: 'Friends & Notifications',      start: 5, end: 7, cat: 'features', label: '2-3w ✅' },
+  { num: 6, name: 'Payments (Gateway + Xendit)',    start: 10, end: 11, cat: 'payments', label: '3-4w' },
+  { num: 4, name: 'Dagdag / Libre / Reserve',      start: 10, end: 13, cat: 'features', label: '5-6w ✅' },
+  { num: 7, name: 'Anti-Spoofing (Quorum)',        start: 12, end: 13, cat: 'features', label: '4-5w \u2705' },
+  { num: 8, name: 'Revenue, Recon & Dashboard',   start: 12, end: 13, cat: 'features', label: '4-6w \u2705' },
+];
+
+const milestones = [
+  { month: 1, label: 'Clean Codebase' },
+  { month: 6, label: 'Pilot Launch' },
+  { month: 8, label: 'Approach Xendit' },
+  { month: 11, label: 'Production Launch' },
+  { month: 13, label: 'Full Features' },
+];
+
+const catColors = {
+  infra: 'var(--infra)',
+  mobile: 'var(--mobile)',
+  compliance: 'var(--compliance)',
+  payments: 'var(--payments)',
+  features: 'var(--features)',
+};
+
+const tbody = document.getElementById('ganttBody');
+
+phases.forEach(ph => {
+  const tr = document.createElement('tr');
+  const labelTd = document.createElement('td');
+  labelTd.innerHTML = `<div class="phase-label">
+    <span class="phase-num" style="background:${catColors[ph.cat]}">${ph.num}</span>
+    <span>${ph.name}</span>
+  </div>`;
+  tr.appendChild(labelTd);
+
+  for (let m = 1; m <= GANTT_MONTHS; m++) {
+    const td = document.createElement('td');
+    if (m === ph.start) {
+      const span = ph.end - ph.start + 1;
+      const bar = document.createElement('div');
+      bar.className = 'bar';
+      bar.style.left = '4px';
+      bar.style.right = `-${(span - 1) * 100}%`;
+      bar.style.width = `calc(${span * 100}% - 8px)`;
+      if (ph.partial) {
+        bar.style.background = `repeating-linear-gradient(135deg, ${catColors[ph.cat]}, ${catColors[ph.cat]} 6px, rgba(255,255,255,0.3) 6px, rgba(255,255,255,0.3) 10px)`;
+        bar.textContent = ph.label + ' ●';
+        bar.title = `Phase ${ph.num}: ${ph.name} — ${ph.label} (in-progress)`;
+      } else {
+        bar.style.background = catColors[ph.cat];
+        bar.textContent = ph.label;
+        bar.title = `Phase ${ph.num}: ${ph.name} — ${ph.label}`;
+      }
+      td.appendChild(bar);
+    }
+    td.style.width = COL_WIDTH + '%';
+    tr.appendChild(td);
+  }
+  tbody.appendChild(tr);
+});
+
+// Milestone row
+const mTr = document.createElement('tr');
+mTr.className = 'milestone-row';
+const mLabel = document.createElement('td');
+mLabel.innerHTML = '<span style="font-size:12px;font-weight:600;color:var(--milestone)">MILESTONES</span>';
+mTr.appendChild(mLabel);
+for (let m = 1; m <= GANTT_MONTHS; m++) {
+  const td = document.createElement('td');
+  td.style.width = COL_WIDTH + '%';
+  const ms = milestones.find(mi => mi.month === m);
+  if (ms) {
+    const marker = document.createElement('div');
+    marker.className = 'milestone-marker';
+    marker.style.left = '50%';
+    marker.innerHTML = `<div class="milestone-diamond"></div><div class="milestone-label">${ms.label}</div>`;
+    td.appendChild(marker);
+  }
+  mTr.appendChild(td);
+}
+tbody.appendChild(mTr);
+
+// BSP row
+const bspTr = document.createElement('tr');
+const bspLabel = document.createElement('td');
+bspLabel.innerHTML = '<span style="font-size:12px;font-weight:500;color:#b71c1c">BSP EMI License</span>';
+bspTr.appendChild(bspLabel);
+for (let m = 1; m <= GANTT_MONTHS; m++) {
+  const td = document.createElement('td');
+  td.style.width = COL_WIDTH + '%';
+  if (m === 1) {
+    const bar = document.createElement('div');
+    bar.className = 'bsp-bar';
+    bar.style.left = '4px';
+    bar.style.width = `calc(${GANTT_MONTHS * 100}% - 8px)`;
+    bar.textContent = '6-12 months (filed at project start)';
+    td.appendChild(bar);
+  }
+  bspTr.appendChild(td);
+}
+tbody.appendChild(bspTr);
+
+// ============================================================
+// FINANCIAL PROJECTIONS (24 Months — all values in PHP)
+// ============================================================
+const MONTHS = 24;
+const FEE_PER_RIDE = 0.99;  // PHP blended convenience fee
+const AVG_FARE = 23.25;     // PHP blended average fare
+const ONE_OFF_DEV_COST = 810000; // PHP 810K (AI-assisted, padded — 50% over HOA baseline)
+
+// DAU growth curve
+const dauCurve = [
+  0, 0, 0, 0, 0,                // M1-5: dev phase
+  50, 100, 200, 500, 800,       // M6-10: pilot
+  1500, 3000,                    // M11-12: launch
+  5000, 7000, 9000, 11000, 13000, 15000, 17000, 19000, 20000, 22000, 24000, 25000 // M13-24: growth
+];
+
+// Infrastructure cost (PHP/mo) — scales with DAU
+function infraCost(dau) {
+  if (dau <= 0) return 280;       // Domain/DNS only
+  if (dau < 200) return 5600;     // Minimal Cloud Run
+  if (dau < 1000) return 9800;    // + basic Cloud SQL
+  if (dau < 3000) return 14000;   // + Redis
+  if (dau < 10000) return 22400;  // Scale up instances
+  if (dau < 20000) return 28000;  // Higher tier
+  return 33600;                    // Full production scale
+}
+
+// Payment processing rate (decreases with scale + QR Ph)
+function paymentRate(month) {
+  if (month < 11) return 0;       // No live payments before launch
+  if (month < 14) return 0.02;    // 2.0% Xendit standard
+  if (month < 18) return 0.015;   // 1.5% negotiated
+  return 0.01;                     // 1.0% QR Ph + volume discount
+}
+
+// Service costs (SMS OTPs, monitoring, misc)
+function serviceCost(dau) {
+  if (dau <= 0) return 0;
+  return Math.max(200, Math.round(dau * 0.50)); // ~P0.50/DAU/mo
+}
+
+// Compute projections
+const data = [];
+let cumulative = 0;
+
+for (let m = 0; m < MONTHS; m++) {
+  const month = m + 1;
+  const dau = dauCurve[m];
+  const rpd = Math.round(dau * 0.5); // rides per day
+
+  const revenue = Math.round(rpd * 30 * FEE_PER_RIDE);
+  const infra = infraCost(dau);
+  const payment = Math.round(rpd * 30 * AVG_FARE * paymentRate(month));
+  const services = serviceCost(dau);
+  const devCost = (m === 0) ? ONE_OFF_DEV_COST : 0;
+  const operatingCost = infra + payment + services;
+  const totalCost = operatingCost + devCost;
+  const net = revenue - totalCost;
+  cumulative += net;
+
+  data.push({
+    month,
+    label: `M${month}`,
+    dau,
+    rpd,
+    revenue,
+    devCost,
+    infra,
+    payment,
+    services,
+    operatingCost,
+    totalCost,
+    net,
+    cumulative
+  });
+}
+
+// ============================================================
+// DRAW CHART (Canvas — HOA style, PHP values)
+// ============================================================
+const canvas = document.getElementById('financialChart');
+const ctx = canvas.getContext('2d');
+
+function drawChart() {
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  canvas.style.width = rect.width + 'px';
+  canvas.style.height = rect.height + 'px';
+  ctx.scale(dpr, dpr);
+
+  const W = rect.width;
+  const H = rect.height;
+  const PAD = { top: 30, right: 70, bottom: 50, left: 70 };
+  const chartW = W - PAD.left - PAD.right;
+  const chartH = H - PAD.top - PAD.bottom;
+
+  // Scales — left Y includes all costs (dev + operating)
+  const maxCostRev = Math.max(...data.map(d => Math.max(d.revenue, d.totalCost)));
+  const yMax = Math.ceil(maxCostRev / 50000) * 50000 || 50000;
+
+  const minCum = Math.min(...data.map(d => d.cumulative));
+  const maxCum = Math.max(...data.map(d => d.cumulative));
+  const cumMin = Math.floor(minCum / 1000000) * 1000000;
+  const cumMax = Math.ceil(maxCum / 1000000) * 1000000 || 1000000;
+
+  const xStep = chartW / (MONTHS - 1);
+
+  function yPos(val) { return PAD.top + chartH - (val / yMax) * chartH; }
+  function cumYPos(val) { return PAD.top + chartH - ((val - cumMin) / (cumMax - cumMin || 1)) * chartH; }
+  function xPos(i) { return PAD.left + i * xStep; }
+
+  // Background
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, W, H);
+
+  // Grid lines
+  ctx.strokeStyle = '#f0f0f0';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 5; i++) {
+    const y = PAD.top + (chartH / 5) * i;
+    ctx.beginPath();
+    ctx.moveTo(PAD.left, y);
+    ctx.lineTo(W - PAD.right, y);
+    ctx.stroke();
+  }
+
+  // Left Y-axis labels (monthly revenue/cost)
+  ctx.fillStyle = '#5f6368';
+  ctx.font = '11px Segoe UI, sans-serif';
+  ctx.textAlign = 'right';
+  for (let i = 0; i <= 5; i++) {
+    const val = yMax - (yMax / 5) * i;
+    const y = PAD.top + (chartH / 5) * i;
+    if (val >= 1000000) {
+      ctx.fillText((val / 1000000).toFixed(1) + 'M', PAD.left - 8, y + 4);
+    } else {
+      ctx.fillText((val / 1000).toFixed(0) + 'K', PAD.left - 8, y + 4);
+    }
+  }
+
+  // Right Y-axis labels (cumulative P&L)
+  ctx.textAlign = 'left';
+  for (let i = 0; i <= 5; i++) {
+    const val = cumMax - ((cumMax - cumMin) / 5) * i;
+    const y = PAD.top + (chartH / 5) * i;
+    const abs = Math.abs(val);
+    let label;
+    if (abs >= 1000000) {
+      label = (val >= 0 ? '' : '-') + (abs / 1000000).toFixed(1) + 'M';
+    } else {
+      label = (val >= 0 ? '' : '-') + (abs / 1000).toFixed(0) + 'K';
+    }
+    ctx.fillText(label, W - PAD.right + 8, y + 4);
+  }
+
+  // X-axis labels
+  ctx.textAlign = 'center';
+  for (let i = 0; i < MONTHS; i++) {
+    if (i % 3 === 0 || i === MONTHS - 1) {
+      ctx.fillText(`M${i + 1}`, xPos(i), H - PAD.bottom + 20);
+    }
+  }
+
+  // Y-axis titles
+  ctx.save();
+  ctx.translate(14, PAD.top + chartH / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.textAlign = 'center';
+  ctx.font = '11px Segoe UI, sans-serif';
+  ctx.fillStyle = '#5f6368';
+  ctx.fillText('Monthly (PHP)', 0, 0);
+  ctx.restore();
+
+  ctx.save();
+  ctx.translate(W - 8, PAD.top + chartH / 2);
+  ctx.rotate(Math.PI / 2);
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#6a1b9a';
+  ctx.fillText('Cumulative P&L (PHP)', 0, 0);
+  ctx.restore();
+
+  // Cumulative P&L area fill
+  const zeroY = cumYPos(0);
+  ctx.beginPath();
+  ctx.moveTo(xPos(0), zeroY);
+  for (let i = 0; i < data.length; i++) {
+    ctx.lineTo(xPos(i), cumYPos(data[i].cumulative));
+  }
+  ctx.lineTo(xPos(data.length - 1), zeroY);
+  ctx.closePath();
+  const cumGrad = ctx.createLinearGradient(0, PAD.top, 0, PAD.top + chartH);
+  cumGrad.addColorStop(0, 'rgba(21, 101, 192, 0.15)');
+  cumGrad.addColorStop(0.5, 'rgba(21, 101, 192, 0.05)');
+  cumGrad.addColorStop(1, 'rgba(198, 40, 40, 0.1)');
+  ctx.fillStyle = cumGrad;
+  ctx.fill();
+
+  // Cumulative P&L line (dashed)
+  ctx.beginPath();
+  ctx.strokeStyle = '#1565c0';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([6, 3]);
+  for (let i = 0; i < data.length; i++) {
+    if (i === 0) ctx.moveTo(xPos(i), cumYPos(data[i].cumulative));
+    else ctx.lineTo(xPos(i), cumYPos(data[i].cumulative));
+  }
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Revenue line
+  ctx.beginPath();
+  ctx.strokeStyle = '#2e7d32';
+  ctx.lineWidth = 2.5;
+  for (let i = 0; i < data.length; i++) {
+    if (i === 0) ctx.moveTo(xPos(i), yPos(data[i].revenue));
+    else ctx.lineTo(xPos(i), yPos(data[i].revenue));
+  }
+  ctx.stroke();
+
+  // Revenue dots
+  ctx.fillStyle = '#2e7d32';
+  for (let i = 0; i < data.length; i++) {
+    ctx.beginPath();
+    ctx.arc(xPos(i), yPos(data[i].revenue), 3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Total cost line (includes one-off dev cost in M1)
+  ctx.beginPath();
+  ctx.strokeStyle = '#c62828';
+  ctx.lineWidth = 2.5;
+  for (let i = 0; i < data.length; i++) {
+    if (i === 0) ctx.moveTo(xPos(i), yPos(data[i].totalCost));
+    else ctx.lineTo(xPos(i), yPos(data[i].totalCost));
+  }
+  ctx.stroke();
+
+  // Total cost dots
+  ctx.fillStyle = '#c62828';
+  for (let i = 0; i < data.length; i++) {
+    ctx.beginPath();
+    ctx.arc(xPos(i), yPos(data[i].totalCost), 3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Monthly breakeven marker (revenue >= total costs)
+  let monthlyBE = -1;
+  for (let i = 0; i < data.length; i++) {
+    if (data[i].revenue > 0 && data[i].revenue >= data[i].totalCost && monthlyBE === -1) {
+      monthlyBE = i;
+    }
+  }
+  if (monthlyBE >= 0) {
+    const bx = xPos(monthlyBE);
+    ctx.strokeStyle = '#6d28d9';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(bx, PAD.top);
+    ctx.lineTo(bx, PAD.top + chartH);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.fillStyle = '#6d28d9';
+    ctx.font = 'bold 11px Segoe UI, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('MONTHLY BREAKEVEN', bx, PAD.top - 8);
+    ctx.fillText(`M${monthlyBE + 1}`, bx, PAD.top - 20);
+  }
+
+  // Zero line for cumulative
+  ctx.strokeStyle = '#999';
+  ctx.lineWidth = 0.5;
+  ctx.setLineDash([2, 2]);
+  ctx.beginPath();
+  ctx.moveTo(PAD.left, zeroY);
+  ctx.lineTo(W - PAD.right, zeroY);
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+drawChart();
+window.addEventListener('resize', drawChart);
+
+// ============================================================
+// DATA TABLE
+// ============================================================
+const dataBody = document.getElementById('dataBody');
+
+function fmt(n) {
+  return Math.abs(n).toLocaleString('en-PH');
+}
+
+function pfmt(n) {
+  if (n < 0) return '-P' + fmt(n);
+  return 'P' + fmt(n);
+}
+
+let breakEvenFound = false;
+data.forEach((d, i) => {
+  const tr = document.createElement('tr');
+  const isBreakEven = !breakEvenFound && d.revenue > 0 && d.revenue >= d.totalCost;
+  if (isBreakEven) {
+    tr.className = 'break-even';
+    breakEvenFound = true;
+  }
+
+  tr.innerHTML = `
+    <td>${d.label}</td>
+    <td>${fmt(d.dau)}</td>
+    <td>${fmt(d.rpd)}</td>
+    <td class="positive">${pfmt(d.revenue)}</td>
+    <td${d.devCost > 0 ? ' class="negative"' : ''}>${pfmt(d.devCost)}</td>
+    <td>${pfmt(d.infra)}</td>
+    <td>${pfmt(d.payment)}</td>
+    <td class="negative">${pfmt(d.totalCost)}</td>
+    <td class="${d.net >= 0 ? 'positive' : 'negative'}">${pfmt(d.net)}</td>
+    <td class="${d.cumulative >= 0 ? 'positive' : 'negative'}">${pfmt(d.cumulative)}</td>
+  `;
+  dataBody.appendChild(tr);
+});
+
+// Totals row
+const totalRow = document.createElement('tr');
+totalRow.className = 'subtotal';
+const totRevenue = data.reduce((s, d) => s + d.revenue, 0);
+const totCost = data.reduce((s, d) => s + d.totalCost, 0);
+const totNet = totRevenue - totCost;
+const lastD = data[data.length - 1];
+totalRow.innerHTML = `
+  <td>TOTAL (24mo)</td>
+  <td>${fmt(lastD.dau)}</td>
+  <td>${fmt(lastD.rpd)}</td>
+  <td class="positive">${pfmt(totRevenue)}</td>
+  <td class="negative">${pfmt(ONE_OFF_DEV_COST)}</td>
+  <td>${pfmt(data.reduce((s, d) => s + d.infra, 0))}</td>
+  <td>${pfmt(data.reduce((s, d) => s + d.payment, 0))}</td>
+  <td class="negative">${pfmt(totCost)}</td>
+  <td class="${totNet >= 0 ? 'positive' : 'negative'}">${pfmt(totNet)}</td>
+  <td class="${lastD.cumulative >= 0 ? 'positive' : 'negative'}">${pfmt(lastD.cumulative)}</td>
+`;
+dataBody.appendChild(totalRow);
+</script>
+
+</body>
+</html>
