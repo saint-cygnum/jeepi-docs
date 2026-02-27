@@ -911,6 +911,7 @@ Optimized for **least rework** — each phase builds on the one before, avoiding
 | ✅ 14 | **Admin Auth + Sidebar** | Login gate, sidebar layout, role-based nav filtering, server logout — 427 vitest + 17 E2E |
 | ✅ 15 | **Google OAuth** | Google Sign-In for passenger + admin login, mock mode for dev/test, account linking — 438 vitest + 17 E2E |
 | ✅ 16 | **Phone OTP Login** | Phone-based OTP login for passengers + admins, Semaphore SMS, dev mock mode, auto-register — 454 vitest + 17 E2E |
+| ✅ 17 | **Staging Bot Protection** | Dynamic robots.txt + X-Robots-Tag noindex header for non-production, go-live SEO checklist — 454 vitest + 17 E2E |
 
 **Why this order:** Doing Payments (Phase 6) before KYC (Phase 5) would require retrofitting tier enforcement into every payment endpoint. Doing KYC before Security (Phase 2.5) would require retrofitting RBAC into every admin page. This sequence ensures each layer is in place before the next one needs it.
 

@@ -1317,6 +1317,22 @@ All client-to-server API calls go through a `RequestQueue` in the Capacitor app:
 
 ### C.4 Rate Limiting & Bot Prevention (Phase 0+)
 
+**Staging SEO Protection (implemented):**
+
+Staging environments are protected from search engine indexing to prevent SEO pollution:
+
+| Layer | Implementation | Environment |
+|---|---|---|
+| **robots.txt** | Dynamic route: `Disallow: /` in staging, `Allow: /` in production | All |
+| **X-Robots-Tag** | `noindex, nofollow` header on all responses in non-production | Staging/Dev |
+
+**Go-live checklist (production SEO & security):**
+
+- [ ] **Cloud Run IAM auth** — Set `--no-allow-unauthenticated` on staging Cloud Run service to fully lock down staging to authenticated users only. Requires `roles/run.invoker` IAM role for team members.
+- [ ] **Cloud Armor WAF** — Configure Cloud Armor security policy for production Cloud Run with: (a) rate limiting rules per IP, (b) geographic restrictions if needed, (c) bot detection via reCAPTCHA Enterprise or Cloudflare Turnstile integration.
+- [ ] **Production robots.txt** — Verify `robots.txt` returns `Allow: /` in production (auto-handled by `NODE_ENV` check in server.js).
+- [ ] **Sitemap.xml** — Generate and submit sitemap to Google Search Console for production domain.
+
 **Layered protection, cost-optimized:**
 
 | Layer | Tool | Cost | What it stops |
@@ -1702,6 +1718,8 @@ Test and simulation features are guarded by `NODE_ENV` checks. In production (`N
 - [ ] Xendit keys are real production keys (not `xnd_development_dummy_*`)
 - [ ] Frontend quick-login buttons are hidden (detect via `NODE_ENV` or build flag)
 - [ ] Passenger/driver web access is blocked in production (see §C.16)
+- [ ] `robots.txt` returns `Allow: /` in production, `Disallow: /` in staging
+- [ ] Staging Cloud Run has `--no-allow-unauthenticated` set (IAM auth)
 
 ### C.16 Platform Access Policy — Mobile-Only in Production
 
