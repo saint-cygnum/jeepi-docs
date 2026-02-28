@@ -1547,3 +1547,69 @@ Merged the separate `Driver` model into the unified `User` table. All users (pas
 
 ---
 
+# Phase 13: Discounted Fares
+
+## Implementation Status
+
+✅ **COMPLETED** (2026-02-28)
+
+## Overview
+
+Implements Philippine mandatory fare discounts (RA 9994 Senior Citizens, RA 10754 PWD, RA 11314 Students). 20% fare discount + 50% convenience fee reduction for verified users. KYC verification via document upload + selfie with timestamp watermark. Admin review with side-by-side layout. Automatic expiry sweep.
+
+## Schema Changes
+
+- **PassengerProfile**: +`discountType` (String?), +`discountVerifiedAt` (DateTime?)
+- **Seat**: +`discountType` (String?), +`discountApplied` (Float?)
+- **SystemSettings**: +`discountRate` (Float, default 0.20), +`discountConvenienceFactor` (Float, default 0.50)
+- **KycDocument**: +`expiresAt` (DateTime?)
+
+## Backend Changes
+
+| File | Change |
+|------|--------|
+| `config/constants.js` | +DISCOUNT_TYPES, +DISCOUNT_DOC_MAP, +DISCOUNT_EXPIRY_DAYS; extended KYC_DOC_TYPES with student_id/osca_id/pwd_id |
+| `services/geo.js` | `calculateFare()` + `calculateMaxFare()` accept optional `discountRate` param |
+| `services/payment-service.js` | +`getDiscountInfo()` resolves verified discount for passenger; wired into hold/settle |
+| `routes/seats.js` | hop-in + para-request inject discount rate, cache discountType/discountApplied on seat |
+| `routes/settings.js` | +discountRate, +discountConvenienceFactor to ALLOWED_KEYS |
+| `routes/passengers.js` | +PUT /:id/selfie endpoint for selfie upload |
+| `services/kyc-service.js` | reviewDocument sets/clears discountType on approve/reject; getPendingDocuments includes selfie for admin review |
+| `server.js` | +discount expiry sweep (24h setInterval) — auto-clears expired discounts, notifies user |
+
+## Frontend Changes
+
+| File | Change |
+|------|--------|
+| `pages/passenger.js` | Selfie truncation fix (full base64), timestamp watermark on capture, discount badge in selection view, fare display with discount info, apply-for-discount flow (type select → selfie → doc upload) |
+| `pages/driver.js` | Discount badge per passenger in seat display (`formatPassengerLabel()` with type-specific icons) |
+| `pages/admin-kyc.js` | Side-by-side modal (selfie vs ID doc) for discount doc review |
+| `pages/admin-settings.js` | Discount rate + convenience fee factor config inputs |
+| `index.css` | Discount badge styles (`.discount-badge`, type-specific colors) |
+
+## Design Decisions
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Discount storage | `PassengerProfile.discountType` | One discount per user, no separate table needed |
+| Cost bearer | Driver absorbs (receives 80% fare) | Simplest settlement |
+| Selfie liveness | Timestamp watermark on capture | Proves photo is fresh, no ML needed |
+| Admin review | Side-by-side selfie vs ID in existing KYC modal | No new admin page |
+| Expiry | Student 180d, Senior permanent, PWD 365d | Per Philippine law requirements |
+
+## Seed Data
+
+- Jose Rizal (jose@jeepi.com): verified student discount, ₱100 balance
+- Andres Bonifacio (andres@jeepi.com): pending PWD doc
+- Juan Luna (juan@jeepi.com): approved senior citizen (OSCA ID)
+- 3 new SVG placeholders for student_id, osca_id, pwd_id doc types
+
+## Test Changes
+
+- **467 vitest tests passing** (+13 new discount-fares.test.js)
+- **32 Playwright E2E tests passing** (+5 new discount-fares.spec.js)
+- Integration tests cover: full fare control, discounted hop-in/para-request, convenience fee discount, admin approve/reject, expiry, configurable rate, audit trail
+- E2E tests cover: passenger discount badge, admin settings controls, admin KYC page, student boarding flow, driver seat count with discount passenger
+
+---
+

@@ -583,3 +583,38 @@ model DriverProfile {
 
 `Trip.driverId` continues to reference `User.id` — UUIDs were preserved during migration. API responses use `flattenUserProfiles()` to merge profile fields into the top-level object for backward compatibility.
 
+### Phase 13 Schema Changes — Discounted Fares
+
+Adds discount support across four models to implement Philippine mandatory fare discounts (RA 9994 Senior Citizens, RA 10754 PWD, RA 11314 Students):
+
+```prisma
+model PassengerProfile {
+  // ... existing fields ...
+  discountType         String?    // null | 'student' | 'senior_citizen' | 'pwd'
+  discountVerifiedAt   DateTime?  // when admin approved the discount
+}
+
+model Seat {
+  // ... existing fields ...
+  discountApplied      Float?     // discount amount deducted (audit trail)
+  discountType         String?    // cached from passenger at hop-in time
+}
+
+model SystemSettings {
+  // ... existing fields ...
+  discountRate                Float   @default(0.20)   // 20% mandated by law
+  discountConvenienceFactor   Float   @default(0.50)   // 50% off convenience fee
+}
+
+model KycDocument {
+  // ... existing fields ...
+  expiresAt   DateTime?   // when this verification expires
+}
+```
+
+**Design decision:** Discount stored directly on `PassengerProfile` (not a separate `UserDiscount` table as originally planned in production_rollout_strategy.md) because each user can only have one active discount type. Seat caches `discountType` + `discountApplied` at hop-in for driver visibility and audit trail.
+
+**Expiry policy:** Student 180 days, PWD 365 days, Senior permanent (null expiresAt). A 24-hour server sweep auto-clears expired discounts and notifies users to re-verify.
+
+**Migration approach:** Additive — four nullable/defaulted fields across four existing models. Safe for rollback (old code ignores new columns). No data migration needed.
+

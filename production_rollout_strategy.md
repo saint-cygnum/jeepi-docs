@@ -762,55 +762,66 @@ Fee amounts configurable in `globalSettings`: `passengerBoardingFee` and `driver
 
 ### 6.1.1 Mandatory Fare Discounts (Philippine Law)
 
-Three Philippine laws **mandate** a 20% fare discount on public transport. Non-compliance carries fines (₱1K–₱15K) and franchise revocation. Jeepi must enforce these automatically:
+> ✅ **IMPLEMENTED** (Phase 13, 2026-02-28)
+
+Three Philippine laws **mandate** a 20% fare discount on public transport. Non-compliance carries fines (₱1K–₱15K) and franchise revocation. Jeepi enforces these automatically:
 
 | Group | Law | Fare Discount | Convenience Fee | Verification |
 |---|---|---|---|---|
-| **Students** | RA 11314 (Student Fare Discount Act) | 20% off fare | 50% off (₱0.60) | School ID photo match + selfie; valid during entire enrollment period incl. weekends/holidays |
-| **Senior Citizens** | RA 9994 (Expanded Senior Citizens Act) | 20% off fare + VAT exempt | 50% off (₱0.60) | Gov't ID showing age 60+ (OSCA ID, driver's license, voter's ID, SSS/GSIS, passport); or birth certificate |
-| **PWD** | RA 10754 | 20% off fare | 50% off (₱0.60) | PWD ID issued by NCWDP or authorized LGU |
+| **Students** | RA 11314 (Student Fare Discount Act) | 20% off fare | 50% off | School ID upload + selfie with timestamp watermark; 180-day expiry |
+| **Senior Citizens** | RA 9994 (Expanded Senior Citizens Act) | 20% off fare + VAT exempt | 50% off | OSCA ID upload; permanent (no expiry) |
+| **PWD** | RA 10754 | 20% off fare | 50% off | PWD ID upload; 365-day expiry |
 
-**Implementation:**
+**Actual implementation (differs from original plan):**
+
+Instead of a separate `UserDiscount` table, discount fields live directly on `PassengerProfile`:
 
 ```prisma
-model UserDiscount {
-  id             String   @id @default(uuid())
-  userId         String   @unique
-  discountType   String   // student | senior_citizen | pwd
-  verificationId String?  // uploaded ID photo reference (Cloud Storage)
-  selfieId       String?  // selfie for face match (students)
-  idExpiry       DateTime? // student IDs expire per semester
-  status         String   @default("pending") // pending | verified | rejected | expired
-  verifiedBy     String?  // admin who approved
-  verifiedAt     DateTime?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  user           User     @relation(fields: [userId], references: [id])
+model PassengerProfile {
+  // ... existing fields ...
+  discountType         String?    // null | 'student' | 'senior_citizen' | 'pwd'
+  discountVerifiedAt   DateTime?
+}
+
+model Seat {
+  // ... existing fields ...
+  discountApplied      Float?     // audit trail: amount deducted
+  discountType         String?    // cached from passenger at hop-in
+}
+
+model SystemSettings {
+  // ... existing fields ...
+  discountRate                Float   @default(0.20)
+  discountConvenienceFactor   Float   @default(0.50)
+}
+
+model KycDocument {
+  // ... existing fields ...
+  expiresAt   DateTime?   // when verification expires
 }
 ```
 
-**Fare calculation with discount (in `calculateFare()`):**
+**Fare calculation (in `services/geo.js`):**
 ```javascript
-function calculateFare(baseAmount, userDiscountType) {
-  const DISCOUNT_RATE = 0.20; // 20% mandated by law
-  const discountedFare = ['student', 'senior_citizen', 'pwd'].includes(userDiscountType)
-    ? baseAmount * (1 - DISCOUNT_RATE)
-    : baseAmount;
-  return Math.round(discountedFare * 100) / 100; // round to centavo
+calculateFare(distanceKm, settings, discountRate = 0) {
+  // ... existing base fare logic ...
+  if (discountRate > 0) fare = Math.round(fare * (1 - discountRate) * 100) / 100;
+  return fare;
 }
+```
 
-function getConvenienceFee(userDiscountType, settings) {
-  const DISCOUNT_MULTIPLIER = 0.50; // 50% off convenience fee for eligible groups
-  const baseFee = settings.passengerBoardingFee; // ₱1.00 default
-  return ['student', 'senior_citizen', 'pwd'].includes(userDiscountType)
-    ? baseFee * DISCOUNT_MULTIPLIER
-    : baseFee;
+**Convenience fee discount (in `services/fee-service.js`):**
+```javascript
+function getPassengerFee(discountType, settings) {
+  const baseFee = settings?.passengerBoardingFee ?? 1.00;
+  if (['student', 'senior_citizen', 'pwd'].includes(discountType)) {
+    return Math.round(baseFee * (settings?.discountConvenienceFactor ?? 0.50) * 100) / 100;
+  }
+  return baseFee;
 }
 ```
 
 **Revenue impact (blended model):**
-
-Estimated rider composition for Philippine jeepney:
 
 | Segment | % of Riders | Fare | Conv. Fee | Blended Rev/Ride |
 |---|---|---|---|---|
@@ -820,16 +831,16 @@ Estimated rider composition for Philippine jeepney:
 | PWD | ~3% | ₱20.00 (−20%) | ₱0.60 (−50%) | ₱0.018 |
 | **Blended** | **100%** | **₱23.25** | **₱0.99** | **₱0.990** |
 
-This reduces the effective per-ride revenue from ₱1.20 to **~₱0.99** (17.5% reduction). The projection chart uses this blended rate.
-
-**Verification flow (Phase 3 KYC extension):**
-1. User selects discount type during registration or in settings
-2. Uploads required ID photo (school ID / OSCA / PWD card)
-3. For students: selfie is matched against school ID photo (basic face match)
-4. For seniors: DOB extracted from ID and validated (age ≥ 60)
-5. Admin reviews and approves/rejects via admin dashboard
-6. Approved users get `discountType` flag on their account
-7. Student discounts auto-expire at end of semester — user must re-verify
+**Verification flow (implemented):**
+1. Passenger taps "Apply for Discount" in selection view
+2. Selects type (Student / Senior Citizen / PWD)
+3. Captures selfie with timestamp watermark (proves liveness, no ML)
+4. Uploads required ID document (student_id / osca_id / pwd_id)
+5. Document appears in Admin KYC page with side-by-side view (selfie + ID)
+6. Admin approves → `discountType` set on PassengerProfile, `expiresAt` set on KycDocument
+7. Admin rejects → `discountType` cleared
+8. 24-hour server sweep auto-expires lapsed discounts and notifies user to re-verify
+9. Discount badge visible to passenger (selection view) and driver (seat display)
 
 ### 6.2 Founders Dashboard (New Admin Role + Page)
 - Role: `founder` (separate from `admin`) — access to `admin-founders.html`

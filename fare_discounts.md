@@ -1,7 +1,7 @@
 # Philippine Jeepney Fare Discount Regulations
 
 > **Last updated:** 2026-02-28
-> **Implementation status:** Not yet implemented in codebase. Fare calculation in `services/geo.js` charges flat rates to all passengers.
+> **Implementation status:** ✅ Implemented (Phase 13). Fare calculation in `services/geo.js` accepts `discountRate` param. Discount stored on `PassengerProfile.discountType`, cached on `Seat.discountType` at hop-in. KYC verification via `student_id`/`osca_id`/`pwd_id` doc types. Admin review with side-by-side selfie/ID modal. 24h expiry sweep.
 
 ## Current Fare Formula (No Discounts)
 
@@ -157,26 +157,38 @@ Revenue-per-ride drops from PHP 1.00 to ~PHP 0.81 (19% reduction vs flat rate).
 
 ---
 
-## Planned Schema (Not Yet in Prisma)
+## Actual Schema (Implemented)
+
+Instead of a separate `UserDiscount` table, discount is stored directly on `PassengerProfile`:
 
 ```prisma
-model UserDiscount {
-  id             String    @id @default(uuid())
-  userId         String    @unique
-  discountType   String    // student | senior_citizen | pwd | athlete
-  verificationId String?   // uploaded ID photo reference
-  selfieId       String?   // selfie for face match (students)
-  idExpiry       DateTime? // student IDs expire per semester; athlete IDs annually
-  status         String    @default("pending") // pending | verified | rejected | expired
-  verifiedBy     String?   // admin who approved
-  verifiedAt     DateTime?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-  user           User      @relation(fields: [userId], references: [id])
+model PassengerProfile {
+  // ... existing fields ...
+  discountType         String?    // null | 'student' | 'senior_citizen' | 'pwd'
+  discountVerifiedAt   DateTime?
+}
+
+model Seat {
+  // ... existing fields ...
+  discountApplied      Float?     // audit: discount amount deducted
+  discountType         String?    // cached from passenger at hop-in time
+}
+
+model SystemSettings {
+  // ... existing fields ...
+  discountRate                Float   @default(0.20)   // configurable via admin
+  discountConvenienceFactor   Float   @default(0.50)   // configurable via admin
+}
+
+model KycDocument {
+  // ... existing fields ...
+  expiresAt   DateTime?   // student: 180d, pwd: 365d, senior: null (permanent)
 }
 ```
 
-Children's fare does not need a `UserDiscount` record — it's determined at boarding time by height (driver confirms).
+**Rationale:** One discount per user, no need for a full relational table. KYC verification (upload + admin review) uses the existing `KycDocument` model with new doc types (`student_id`, `osca_id`, `pwd_id`).
+
+Children's fare does not need a discount record — it's determined at boarding time by height (driver confirms). Not yet implemented in code.
 
 ---
 

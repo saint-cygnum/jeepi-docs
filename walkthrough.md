@@ -16,8 +16,8 @@ This document summarizes the implementation and verification of Phase 6, includi
 - `services/gps-simulator.js`: Server-side simulation of jeepney movement.
 
 ### 3. Backend Endpoints (`server.js`)
-- `POST /api/seat/hopin`: Handles boarding logic, calculates max fare, holds passenger balance, and updates seat status.
-- `POST /api/seat/para-request`: Handles "Stop" request, calculates actual fare based on distance, and updates seat.
+- `POST /api/seat/hopin`: Handles boarding logic, calculates max fare (applying discount if verified), holds passenger balance, caches `discountType` on seat, and updates seat status.
+- `POST /api/seat/para-request`: Handles "Stop" request, calculates actual fare based on distance (with discount), records `discountApplied` amount on seat, and updates seat.
 - `POST /api/seat/settle`: Releases seat, transfers fare to driver, refunds excess hold to passenger, and creates transactions.
 - **GPS Simulation**: Automatically starts for all drivers in non-production environments (or when `ENABLE_GPS_SIM=true`).
 
@@ -365,7 +365,9 @@ Auth: Required (`x-session-token` + `x-user-id`)
 Body: `{ "docType": "government_id", "fileData": "data:image/jpeg;base64,...", "fileName": "id-front.jpg" }`
 Response: `{ success: true, document: { id, userId, docType, status: "pending", ... } }`
 
-Valid docTypes: `government_id`, `proof_of_address`, `drivers_license`, `cpc`, `or_cr`
+Valid docTypes: `government_id`, `proof_of_address`, `drivers_license`, `cpc`, `or_cr`, `student_id`, `osca_id`, `pwd_id`
+
+**Discount doc types** (`student_id`, `osca_id`, `pwd_id`): When approved, these automatically set `discountType` on the passenger's profile and calculate `expiresAt` based on type (student: 180d, pwd: 365d, senior: permanent). When rejected, `discountType` is cleared.
 
 ### List Own Documents
 `GET /api/kyc/documents`
@@ -387,6 +389,29 @@ Response: `{ success: true, documents: [...] }`
 Auth: Required (admin role)
 Body: `{ "documentId": "uuid", "status": "approved"|"rejected", "notes": "optional review notes" }`
 Response: `{ success: true, document: {...}, newKycLevel: 1 }`
+
+For discount doc types (`student_id`, `osca_id`, `pwd_id`), the response also includes the passenger's selfie for side-by-side comparison in the admin review modal. Approval sets `PassengerProfile.discountType` + `KycDocument.expiresAt`; rejection clears `discountType`.
+
+### Upload Selfie
+`PUT /api/passengers/:id/selfie`
+Auth: Required (must match `:id`)
+Body: `{ "selfie": "data:image/jpeg;base64,..." }`
+Response: `{ success: true }`
+
+Used during the discount application flow to upload a selfie with timestamp watermark before uploading the ID document.
+
+---
+
+## Discount Fare Settings (Phase 13)
+
+Discount rate and convenience fee factor are configurable via the admin settings API:
+
+| Setting Key | Default | Description |
+|---|---|---|
+| `discountRate` | 0.20 | Fare discount rate (20% mandated by law) |
+| `discountConvenienceFactor` | 0.50 | Convenience fee multiplier for discount users |
+
+These are part of the existing `GET /api/settings` and `PUT /api/settings` endpoints (admin auth required). The admin settings page (`pages/admin-settings.html`) includes input fields for both values.
 
 ---
 
