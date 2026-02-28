@@ -343,6 +343,7 @@ DATABASE_URL="postgresql://jeepi-app@localhost:5432/jeepi?host=/cloudsql/jeepi-p
 | `/api/v1/*` URL rewrite middleware (aliasing to `/api/*`) | Phase 10C | `server.js` |
 | `GET /api/config` public endpoint + `X-Jeepi-Version` 426 middleware | Phase 10C | `routes/config.js`, `middleware/version-check.js` |
 | Idempotency middleware on POST mutations | Phase 10D | `middleware/idempotency.js` |
+| Phase 12 Driver-User Unification (remove `Driver` model, add `PassengerProfile` + `DriverProfile`) | Phase 12 | `prisma/schema.prisma`, `scripts/migrate-drivers.js` |
 
 ### Phase 4 Schema Additions — Dagdag Bayad & Libre Ka-Jeepi
 
@@ -370,10 +371,8 @@ model User {
   tosVersion     String?                 // Version of ToS accepted
 }
 
-model Driver {
-  // ... existing fields ...
-  kycLevel       Int       @default(0)
-}
+// NOTE: Driver model was removed in Phase 12 (Driver-User Unification).
+// kycLevel now lives on the shared User model. Driver-specific fields moved to DriverProfile.
 
 model KycDocument {
   id           String    @id @default(cuid())
@@ -490,7 +489,7 @@ model PlatformCost {
 model ReconciliationReport {
   id               String   @id @default(uuid())
   timestamp        DateTime @default(now())
-  sumWallets       Float    // sum of all User + Driver balances
+  sumWallets       Float    // sum of all PassengerProfile + DriverProfile balances
   transactionLedger Float   // sum of all Transaction amounts
   variance         Float    // abs difference
   status           String   // "ok", "warning", "critical"
@@ -530,4 +529,57 @@ model SystemSettings {
 ```
 
 **Migration approach:** Additive — one new model with all defaults, one new SystemSettings string with default. Safe for rollback (old code ignores new model/column). The `IdempotencyKey` model uses database storage instead of Redis (as originally planned in the cross-cutting concerns) since the project does not yet have Redis in production. Lazy cleanup on each middleware invocation keeps the table small. No data migration needed.
+
+### Phase 12 Schema Changes — Driver-User Table Unification
+
+The separate `Driver` model is removed. All users (passengers, drivers, admins, founders) now live in a single `User` table differentiated by the `role` column. Role-specific data is stored in one-to-one profile tables:
+
+```prisma
+model User {
+  // ... existing shared fields (id, name, email, phone, password, role, auth, security) ...
+  role             String   @default("passenger") // passenger, driver, admin, founder
+
+  // Role profiles (one-to-one, nullable)
+  passengerProfile PassengerProfile?
+  driverProfile    DriverProfile?
+}
+
+model PassengerProfile {
+  id                     String    @id @default(uuid())
+  userId                 String    @unique
+  user                   User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  walletBalance          Float     @default(0)
+  heldBalance            Float     @default(0)
+  selfie                 String?
+  preferences            String?   // JSON { theme, locale }
+  tosAcceptedAt          DateTime?
+  tosVersion             String?
+  autoReloadEnabled      Boolean   @default(false)
+  autoReloadAmount       Float?
+  autoReloadThreshold    Float?
+  defaultPaymentMethodId String?
+}
+
+model DriverProfile {
+  id            String   @id @default(uuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  walletBalance Float    @default(0)   // Driver earnings
+  status        String   @default("active") // active, inactive
+}
+```
+
+**What was removed from User:**
+- `walletBalance`, `heldBalance`, `selfie`, `preferences`, `tosAcceptedAt`, `tosVersion`, `autoReloadEnabled`, `autoReloadAmount`, `autoReloadThreshold`, `defaultPaymentMethodId` → moved to `PassengerProfile`
+
+**What was removed entirely:**
+- `Driver` model (all fields absorbed into `User` + `DriverProfile`)
+
+**Migration approach:** Expand-contract pattern executed in two phases:
+1. **Expand**: Created `PassengerProfile` and `DriverProfile` tables, migrated data from `User` passenger fields and old `Driver` table via `scripts/migrate-drivers.js`.
+2. **Contract**: Removed old `Driver` model and passenger-specific columns from `User`.
+
+`Trip.driverId` continues to reference `User.id` — UUIDs were preserved during migration. API responses use `flattenUserProfiles()` to merge profile fields into the top-level object for backward compatibility.
 

@@ -261,8 +261,12 @@ No test directories, no test runner, no CI pipeline. Two manual scripts exist (`
 
 **Why Vitest:** Fast, native ESM support, Jest-compatible API, excellent with Express + Prisma.
 **Why Supertest:** HTTP assertions for Express routes without starting the server.
-**Why Playwright:** Browser-level E2E smoke tests — validates page loads, auth flows, and Socket.io real-time data.
-**Test DB:** Neon PostgreSQL (shared test branch) with global-setup retry for cold starts. 454 vitest tests, `testTimeout: 30000`. 17 Playwright E2E tests, ~38s runtime (1 worker, sequential).
+**Why Playwright:** Browser-level E2E tests — validates page loads, auth flows, Socket.io real-time data, and full multi-user business workflows (trip lifecycle, wallet, settings).
+**Test DB:** Neon PostgreSQL (shared test branch) with global-setup retry for cold starts. 454 vitest tests, `testTimeout: 30000`. 27 Playwright E2E tests, ~2min runtime (1 worker, sequential).
+
+**Driver-User Unification (Phase 12):** Test fixtures updated — `seedDriver()` now creates a `User` (role=driver) + `DriverProfile` instead of a separate `Driver` record. Driver auth tests use `email` instead of `username`. All existing tests pass without count changes (454 vitest + 17 E2E).
+
+**E2E Major Workflows (Phase 12+):** 10 new Playwright E2E tests covering trip lifecycle (3), wallet (2), settings (3), and passenger flows (2). Uses multi-browser-context tests with `browser.newContext()` for simultaneous driver+passenger sessions. Bug fixes: `active_trip_block` query now filters by active trip status, passenger `updateMenuVisibility()` called after login, register test uses unique phone per run. Total: 454 vitest + 27 E2E.
 
 ### Test Structure
 
@@ -289,11 +293,17 @@ test/
 │   ├── driver-earnings.test.js     — Driver earnings summary, period filters, fee breakdown (9 tests) [Phase 10B]
 │   ├── api-versioning.test.js      — /api/config, v1 prefix aliasing, X-Jeepi-Version 426 middleware (9 tests) [Phase 10C]
 │   └── idempotency.test.js         — Idempotency middleware, key dedup, TTL expiry, lazy cleanup (7 tests) [Phase 10D]
-├── e2e/                            — Playwright browser tests (Sub-Phase 2H + Admin Auth)
+├── e2e/                            — Playwright browser tests (27 total)
+│   ├── global-setup.js             — Pre-test cleanup: stale trips + pending_settlement seats
+│   ├── helpers.js                  — Shared login helpers, Socket.io waits, trip actions
 │   ├── smoke.spec.js               — 4 page load tests (passenger, driver, admin, settings)
 │   ├── auth.spec.js                — 3 auth flow tests (register, passenger login, driver login)
 │   ├── admin.spec.js               — 1 admin dashboard test (fleet data via Socket.io)
-│   └── admin-auth.spec.js          — 9 admin auth tests (login gate, non-admin rejection, sidebar nav, logout, mobile hamburger, sub-page auth, role-based nav filtering)
+│   ├── admin-auth.spec.js          — 9 admin auth tests (login gate, non-admin rejection, sidebar nav, logout, mobile hamburger, sub-page auth, role-based nav filtering)
+│   ├── trip-lifecycle.spec.js      — 3 multi-user trip tests (start, board, wallet deduction, end)
+│   ├── wallet.spec.js              — 2 wallet UI tests (balance display, reload modal)
+│   ├── settings.spec.js            — 3 settings tests (theme toggle, passenger logout, driver logout)
+│   └── passenger-flows.spec.js     — 2 passenger UI tests (boarding options, settings dropdown)
 └── setup.js                        — Test DB init, Prisma client, Express app instance
 ```
 

@@ -203,7 +203,7 @@ Headers: `x-user-id`, `x-session-token`
 
 **User auth** (passenger / admin / founder): reads `x-session-token` + `x-user-id` headers → looks up `prisma.user` → sets `req.userId`, `req.userRole` (from `user.role`, default `'passenger'`).
 
-**Driver auth**: reads `x-session-token` + `x-driver-id` headers → looks up `prisma.driver` → sets `req.userId = driverId`, `req.userRole = 'driver'`.
+**Driver auth**: reads `x-session-token` + `x-driver-id` headers → looks up `prisma.user` (unified User table) → sets `req.userId = driverId`, `req.userRole = 'driver'`.
 
 Both paths check `tokenExpiresAt` — if expired, returns `401` with `{ error: 'Session expired', expired: true }`. If both `x-user-id` and `x-driver-id` are present, User path takes precedence.
 
@@ -252,6 +252,18 @@ Admin pages are gated by `AdminAuth.require()` (`components/admin-auth.js`). On 
 
 Login routes (`routes/auth.js`, `routes/driver-auth.js`) now set `tokenExpiresAt = now + SESSION_EXPIRY_HOURS` (24h) on successful authentication.
 
+### Driver-User Table Unification (Phase 12)
+
+The separate `Driver` model has been removed. All users (passengers, drivers, admins, founders) now reside in a single `User` table with a `role` column. Role-specific data lives in `PassengerProfile` and `DriverProfile` one-to-one tables.
+
+**Driver login** (`POST /api/driver/login`) now accepts `{ email, password }` instead of the previous `{ username, password }`. The endpoint queries `prisma.user` where `role = 'driver'`.
+
+**Driver creation** (`POST /api/drivers`, admin-only) now accepts `{ name, email, password }` instead of `{ name, username, password }`. Creates a `User` (role=driver) with a nested `DriverProfile`.
+
+**Shared auth flows**: Drivers can now use Google OAuth (`POST /api/auth/google`) and Phone OTP (`POST /api/auth/otp/send` + `/verify`) — the same endpoints passengers use. After authentication, the server checks the user's `role` to determine which profile to load.
+
+**API backward compatibility**: All API responses flatten profile fields (`walletBalance`, `heldBalance`, `status`, etc.) into the top-level object via a `flattenUserProfiles()` helper, so existing clients see the same response shape.
+
 ### RBAC Middleware (2.5C)
 
 `middleware/rbac.js` exports two middleware factories:
@@ -264,7 +276,7 @@ Login routes (`routes/auth.js`, `routes/driver-auth.js`) now set `tokenExpiresAt
 
 ### Account Lockout (2.5D)
 
-Schema additions on User and Driver:
+Schema additions on User (shared for all roles — passengers, drivers, admins, founders):
 - `failedLoginAttempts Int @default(0)`
 - `lockedUntil DateTime?`
 
@@ -282,7 +294,7 @@ Behavior:
 |--------|-----------|-----------|
 | `validateRegister` | `POST /api/auth/register` | email (valid format), password (min 6 chars), name (non-empty string) |
 | `validateLogin` | `POST /api/auth/login` | email (valid format), password (non-empty) |
-| `validateDriverLogin` | `POST /api/driver-auth/login` | name (non-empty), password (non-empty) |
+| `validateDriverLogin` | `POST /api/driver-auth/login` | email (valid format), password (non-empty) |
 | `validateWallet` | `POST /api/wallet/reload`, `POST /api/wallet/deduct` | userId (non-empty string), amount (positive number) |
 | `validateHopin` | `POST /api/seat/hopin` | tripId (non-empty string), passengerId (non-empty string) |
 
@@ -482,7 +494,7 @@ When enabled, balance drops below `threshold` after wallet deductions trigger an
 
 **Get Driver Balance**
 `GET /api/driver/wallet/balance`
-Auth: Required (driver auth — `x-driver-token` + `x-driver-id`)
+Auth: Required (driver auth — `x-session-token` + `x-driver-id`, queries User table)
 Response: `{ success: true, balance: 5000 }`
 
 **Driver Cashout (Disbursement)**
@@ -736,7 +748,7 @@ Paginated wallet transaction history for the authenticated user. Filterable by t
 
 ### Get Earnings Summary
 `GET /api/driver/wallet/earnings?period=today|week|month`
-Auth: Required (driver auth — `x-driver-token` + `x-driver-id`)
+Auth: Required (driver auth — `x-session-token` + `x-driver-id`, queries User table)
 Response: `{ success: true, earnings: { period: "today", total: 1250.00, tripCount: 15, feeTotal: 250.00, netEarnings: 1000.00, trips: [{ tripId, fare, fee, net, routeName, completedAt }] } }`
 
 Driver earnings summary with trip-level breakdown. Each trip shows gross fare collected, convenience fee deducted, and net earnings. Period options: `today` (since midnight), `week` (last 7 days), `month` (last 30 days). Trips sorted by `completedAt` descending.

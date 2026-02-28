@@ -912,6 +912,7 @@ Optimized for **least rework** — each phase builds on the one before, avoiding
 | ✅ 15 | **Google OAuth** | Google Sign-In for passenger + admin login, mock mode for dev/test, account linking — 438 vitest + 17 E2E |
 | ✅ 16 | **Phone OTP Login** | Phone-based OTP login for passengers + admins, Semaphore SMS, dev mock mode, auto-register — 454 vitest + 17 E2E |
 | ✅ 17 | **Staging Bot Protection** | Dynamic robots.txt + X-Robots-Tag noindex header for non-production, go-live SEO checklist — 454 vitest + 17 E2E |
+| ✅ 18 | **E2E Major Workflows** | Trip lifecycle (multi-user), wallet, settings, passenger flows — 10 new tests, bug fixes (active_trip_block, updateMenuVisibility, unique phone) — 454 vitest + 27 E2E |
 
 **Why this order:** Doing Payments (Phase 6) before KYC (Phase 5) would require retrofitting tier enforcement into every payment endpoint. Doing KYC before Security (Phase 2.5) would require retrofitting RBAC into every admin page. This sequence ensures each layer is in place before the next one needs it.
 
@@ -1460,6 +1461,89 @@ Adds phone-based OTP login to both passenger and admin login screens. Uses Semap
 | `prisma/seed.js` | +admin phone numbers |
 | `docs/seed_data.md` | +admin phones, +OTP quick test flow |
 | `test/integration/otp-auth.test.js` | NEW — 16 integration tests |
+
+---
+
+# Phase 12: Driver-User Table Unification
+
+## Implementation Status
+
+✅ **COMPLETED** (2026-02-27)
+
+## Overview
+
+Merged the separate `Driver` model into the unified `User` table. All users (passengers, drivers, admins, founders) now live in a single `User` table differentiated by the `role` column. Role-specific data is stored in profile tables (`PassengerProfile`, `DriverProfile`).
+
+**Motivation:** Eliminates dual-auth paths, enables shared authentication flows (Google OAuth, Phone OTP) for drivers, simplifies middleware, and reduces code duplication across auth, wallet, and admin routes.
+
+## Schema Changes
+
+### Removed
+- `Driver` model (previously separate table with `name`, `username`, `password`, `licenseNumber`, `walletBalance`, `status`, session fields, lockout fields, kycLevel)
+
+### Added
+- `PassengerProfile` — one-to-one with User, stores passenger-specific fields:
+  - `walletBalance`, `heldBalance`, `selfie`, `preferences`, `tosAcceptedAt`, `tosVersion`
+  - `autoReloadEnabled`, `autoReloadAmount`, `autoReloadThreshold`, `defaultPaymentMethodId`
+- `DriverProfile` — one-to-one with User, stores driver-specific fields:
+  - `walletBalance`, `status`
+
+### Modified
+- `User` model now has:
+  - `role` column: `"passenger"` (default), `"driver"`, `"admin"`, `"founder"`
+  - `passengerProfile PassengerProfile?` relation
+  - `driverProfile DriverProfile?` relation
+  - All auth/security fields shared: `currentSessionToken`, `tokenExpiresAt`, `failedLoginAttempts`, `lockedUntil`, `kycLevel`, `googleId`, `googleAvatar`, `authProvider`
+- `Trip.driverId` still references `User.id` (UUIDs preserved during migration)
+
+### Migration Approach
+- Expand-contract pattern: new profile tables created, data migrated from old `User` fields and `Driver` table, old columns dropped afterward.
+- `scripts/migrate-drivers.js` handles data migration: copies existing Driver records into User table (role=driver) + creates DriverProfile rows, copies passenger-specific fields into PassengerProfile rows.
+
+## Auth Changes
+
+- **Driver login** now uses `{ email, password }` instead of `{ username, password }`.
+- **Driver creation** (admin) now uses `{ name, email, password }` instead of `{ name, username, password }`.
+- **All auth flows unified**: Google OAuth and Phone OTP login now work for drivers (same `routes/auth.js` endpoints). Auth provider stored in `User.authProvider`.
+- **Auth middleware** (`middleware/auth.js`): both `x-user-id` and `x-driver-id` paths now query `prisma.user` (no more `prisma.driver` table).
+- **Validation**: `validateDriverLogin` now validates `email` (isEmail) instead of `name` (non-empty).
+
+## API Backward Compatibility
+
+- API responses are backward-compatible via `flattenUserProfiles()` helper in `routes/auth.js`. Profile fields (`walletBalance`, `heldBalance`, `status`, etc.) are flattened into the top-level response object so clients see the same shape as before.
+- Driver wallet endpoints (`/api/driver/wallet/*`) continue to work with `x-driver-id` header — the middleware resolves against the User table.
+
+## Files Modified
+
+| File | Change |
+|------|--------|
+| `prisma/schema.prisma` | Removed `Driver` model, added `PassengerProfile` + `DriverProfile`, updated `User` with role profiles |
+| `routes/auth.js` | +flattenUserProfiles helper, profile includes in login/register/OAuth/OTP responses |
+| `routes/driver-auth.js` | Login uses `email` field, queries `prisma.user` with `role: 'driver'` |
+| `routes/drivers.js` | Create driver → `prisma.user.create` with nested `driverProfile`, flatten response |
+| `routes/admin.js` | Driver queries use `prisma.user` with role filter |
+| `routes/driver-wallet.js` | Balance/transactions/cashout/earnings query `prisma.user` + `driverProfile` |
+| `routes/wallet.js` | Wallet ops use `passengerProfile` for balance |
+| `routes/passengers.js` | Include `passengerProfile` in queries |
+| `routes/reservations.js` | Updated for profile-based balance checks |
+| `routes/seats.js` | Seat operations use profile-based wallet balance |
+| `middleware/auth.js` | Both auth paths query `prisma.user` |
+| `middleware/driver-auth.js` | Updated to query `prisma.user` |
+| `middleware/validate.js` | `validateDriverLogin` validates email instead of name |
+| `services/state.js` | State builder uses User+profiles instead of separate Driver table |
+| `services/kyc-service.js` | KYC queries use unified User model |
+| `services/payment-service.js` | Settlement uses profile-based balances |
+| `services/payment-gateway.js` | Disbursement uses profile-based balances |
+| `services/reconciliation-service.js` | Balance audit sums from PassengerProfile + DriverProfile |
+| `server.js` | Updated context, removed Driver model references |
+| `scripts/migrate-drivers.js` | NEW — data migration script |
+
+## Test Changes
+
+- **454 vitest tests passing** (same count, updated fixtures)
+- **17 Playwright E2E tests passing**
+- `seedDriver()` test fixture now creates `User` (role=driver) + `DriverProfile` instead of a separate `Driver` record
+- Driver auth tests updated to use `email` instead of `username`
 
 ---
 

@@ -26,15 +26,15 @@ All passengers have `role: 'passenger'`, `authProvider: 'local'`.
 
 All passwords: `password123`
 
-| Name | Username | Phone | Wallet | KYC | Jeepney | KYC Documents |
-|------|----------|-------|--------|-----|---------|---------------|
-| Mang Juan | juan | 09180000001 | 500 | 2 (Full) | JEEP-001 | license: approved, cpc: approved, or_cr: approved |
-| Mang Kanor | kanor | 09180000002 | 200 | 1 (Basic) | JEEP-002 | license: approved, or_cr: pending |
-| Mang Pedro | pedro | 09180000003 | 0 | 0 (Unverified) | JEEP-003 | license: pending |
-| Mang Rico | rico | 09180000004 | 100 | 1 (Basic) | (unassigned) | license: approved |
-| Mang Ben | ben | 09180000005 | 0 | 2 (Full) | JEEP-005 | license: approved, cpc: approved, or_cr: approved |
+| Name | Email | Phone | Wallet | KYC | Jeepney | KYC Documents |
+|------|-------|-------|--------|-----|---------|---------------|
+| Mang Juan | mangjuan@jeepi.com | 09180000001 | 500 | 2 (Full) | JEEP-001 | license: approved, cpc: approved, or_cr: approved |
+| Mang Kanor | mangkanor@jeepi.com | 09180000002 | 200 | 1 (Basic) | JEEP-002 | license: approved, or_cr: pending |
+| Mang Pedro | mangpedro@jeepi.com | 09180000003 | 0 | 0 (Unverified) | JEEP-003 | license: pending |
+| Mang Rico | mangrico@jeepi.com | 09180000004 | 100 | 1 (Basic) | (unassigned) | license: approved |
+| Mang Ben | mangben@jeepi.com | 09180000005 | 0 | 2 (Full) | JEEP-005 | license: approved, cpc: approved, or_cr: approved |
 
-Drivers authenticate with `username` (not email). Jeepney assignment is via many-to-many `jeepneys` relation.
+Drivers are stored in the `User` table with `role: 'driver'` and a related `DriverProfile` (walletBalance, status). Drivers authenticate with email (same as passengers). Jeepney assignment is via many-to-many `jeepneys` relation on User. Drivers can also use Google OAuth and Phone OTP to log in.
 
 ## Admins + Founder (6)
 
@@ -92,7 +92,7 @@ A default `SystemSettings` record with `id: 'default'` is upserted. Uses schema 
 
 ## Quick Test Flow
 
-1. **Driver login**: username `juan`, password `password123`
+1. **Driver login**: email `mangjuan@jeepi.com`, password `password123`
 2. **Enter Code Manually**: type `JEEP-001` to select jeepney
 3. **Start Trip** — GPS simulation starts automatically
 4. **Passenger login**: email `juan@jeepi.com`, password `password123`
